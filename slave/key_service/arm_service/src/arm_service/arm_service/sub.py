@@ -13,8 +13,10 @@ RIGHT_ARM_CAN = "can1"
 # 坐标转换和缩放因子
 # ROS中的单位是米和弧度，Piper SDK需要的是整数
 # 你需要根据实际情况调整这些缩放比例
-POS_SCALE_FACTOR = 10000000  # 1m -> 1000 units
-ROT_SCALE_FACTOR = 1000000 # 1rad -> 1000 units
+# POS_SCALE_FACTOR = 10000000  # 1m -> 1000 units
+# ROT_SCALE_FACTOR = 1000000 # 1rad -> 1000 units
+POS_SCALE_FACTOR = 50000  # 1m -> 1000 units
+ROT_SCALE_FACTOR = 50000 # 1rad -> 1000 units
 
 class ArmControllerNode(Node):
     def __init__(self):
@@ -24,7 +26,22 @@ class ArmControllerNode(Node):
         # --- 初始化左右臂 ---
         self.left_arm = self.initialize_arm(LEFT_ARM_CAN, "Left")
         self.right_arm = self.initialize_arm(RIGHT_ARM_CAN, "Right")
-
+        self.left_arm_pose = {
+                'joint_1': int(0.2 * POS_SCALE_FACTOR),
+                'joint_2': int(0.2 * POS_SCALE_FACTOR),
+                'joint_3': int(-0.2 * POS_SCALE_FACTOR),
+                'joint_4': int(0.3 * ROT_SCALE_FACTOR),
+                'joint_5': int(-0.2 * ROT_SCALE_FACTOR),
+                'joint_6': int(0.5 * ROT_SCALE_FACTOR),
+            }
+        self.right_arm_pose = {
+                'joint_1': int(0.2 * POS_SCALE_FACTOR),
+                'joint_2': int(0.2 * POS_SCALE_FACTOR),
+                'joint_3': int(-0.2 * POS_SCALE_FACTOR),
+                'joint_4': int(0.3 * ROT_SCALE_FACTOR),
+                'joint_5': int(-0.2 * ROT_SCALE_FACTOR),
+                'joint_6': int(0.5 * ROT_SCALE_FACTOR),
+            }
         # --- 创建订阅者 ---
         if self.left_arm:
             self.left_arm_sub = self.create_subscription(
@@ -103,27 +120,36 @@ class ArmControllerNode(Node):
         
         with self.left_lock:
             # 在每次控制前获取最新的位姿
-            current_pose = self.get_current_pose(self.left_arm)
+            # current_pose = self.get_current_pose(self.left_arm)
             
             # 如果无法获取当前位姿，则放弃本次控制
-            if not current_pose:
-                self.get_logger().warn("Left arm callback skipped: Could not get current pose.")
-                return
+            # if not current_pose:
+            #     self.get_logger().warn("Left arm callback skipped: Could not get current pose.")
+            #     return
 
             # 计算目标位姿
-            target_pose = {
-                'X': current_pose['X'] + int(msg.position.x * POS_SCALE_FACTOR),
-                'Y': current_pose['Y'] + int(msg.position.y * POS_SCALE_FACTOR),
-                'Z': current_pose['Z'] + int(msg.position.z * POS_SCALE_FACTOR),
-                'RX': current_pose['RX'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
-                'RY': current_pose['RY'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
-                'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+            # target_pose = {
+            #     'X': current_pose['X'] + int(msg.position.x * POS_SCALE_FACTOR),
+            #     'Y': current_pose['Y'] + int(msg.position.y * POS_SCALE_FACTOR),
+            #     'Z': current_pose['Z'] + int(msg.position.z * POS_SCALE_FACTOR),
+            #     'RX': current_pose['RX'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
+            #     'RY': current_pose['RY'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
+            #     'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+            # }
+            self.left_arm_pose = {
+                'joint_1': self.left_arm_pose['joint_1'] + int(msg.position.x * POS_SCALE_FACTOR),
+                'joint_2': self.left_arm_pose['joint_2'] + int(msg.position.y * POS_SCALE_FACTOR),
+                'joint_3': self.left_arm_pose['joint_3'] + int(msg.position.z * POS_SCALE_FACTOR),
+                'joint_4': self.left_arm_pose['joint_4'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
+                'joint_5': self.left_arm_pose['joint_5'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
+                'joint_6': self.left_arm_pose['joint_6'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
             }
-            print(target_pose)
+            print(self.left_arm_pose)
             print("1")
             # 发送控制指令
             try:
-                self.left_arm.EndPoseCtrl(**target_pose)
+                #self.left_arm.EndPoseCtrl(**target_pose)
+                self.left_arm.JointCtrl(**self.left_arm_pose)
             except ValueError as e:
                 print(f"Control failed: {str(e)}")
 
@@ -146,26 +172,35 @@ class ArmControllerNode(Node):
             
         with self.right_lock:
             # 在每次控制前获取最新的位姿
-            current_pose = self.get_current_pose(self.right_arm)
+            # current_pose = self.get_current_pose(self.right_arm)
 
             # 如果无法获取当前位姿，则放弃本次控制
-            if not current_pose:
-                self.get_logger().warn("Right arm callback skipped: Could not get current pose.")
-                return
+            # if not current_pose:
+            #     self.get_logger().warn("Right arm callback skipped: Could not get current pose.")
+            #     return
 
             # 计算目标位姿
-            target_pose = {
-                'X': current_pose['X'] + int(msg.position.x * POS_SCALE_FACTOR),
-                'Y': current_pose['Y'] + int(msg.position.y * POS_SCALE_FACTOR),
-                'Z': current_pose['Z'] + int(msg.position.z * POS_SCALE_FACTOR),
-                'RX': current_pose['RX'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
-                'RY': current_pose['RY'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
-                'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+            # target_pose = {
+            #     'X': current_pose['X'] + int(msg.position.x * POS_SCALE_FACTOR),
+            #     'Y': current_pose['Y'] + int(msg.position.y * POS_SCALE_FACTOR),
+            #     'Z': current_pose['Z'] + int(msg.position.z * POS_SCALE_FACTOR),
+            #     'RX': current_pose['RX'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
+            #     'RY': current_pose['RY'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
+            #     'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+            # }
+            self.right_arm_pose = {
+                'joint_1': self.right_arm_pose['joint_1'] + int(msg.position.x * POS_SCALE_FACTOR),
+                'joint_2': self.right_arm_pose['joint_2'] + int(msg.position.y * POS_SCALE_FACTOR),
+                'joint_3': self.right_arm_pose['joint_3'] + int(msg.position.z * POS_SCALE_FACTOR),
+                'joint_4': self.right_arm_pose['joint_4'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
+                'joint_5': self.right_arm_pose['joint_5'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
+                'joint_6': self.right_arm_pose['joint_6'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
             }
-            print(target_pose)
+            print(self.right_arm_pose)
             print("2")
             # 发送控制指令
-            self.right_arm.EndPoseCtrl(**target_pose)
+            # self.right_arm.EndPoseCtrl(**target_pose)
+            self.right_arm.JointCtrl(**self.right_arm_pose)
 
     def right_gripper_callback(self, msg: Bool):
         if not self.right_arm:

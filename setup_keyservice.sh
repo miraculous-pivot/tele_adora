@@ -6,7 +6,6 @@ echo "这是键盘控制方式的服务端"
 #检查环境
 #检查依赖
 #安装依赖
-#构建一些源码安装的包
 #id号绑定要交互式
 
 # 在adora目录下统一构建底盘和升降模块
@@ -66,22 +65,11 @@ cd ../../../../
 echo "=== 启动Orbbec摄像头 ==="
 cd ./slave/video/camera/orbbecsdk
 gnome-terminal --title="ORBBEC CAMERA" --working-directory="$PWD" -- \
-  bash -c "source install/setup.bash;
+  bash -c "colcon build --event-handlers  console_direct+  --cmake-args  -DCMAKE_BUILD_TYPE=Release；
+           source install/setup.bash;
            ros2 launch orbbec_camera astra.launch.py;
            exec bash"
-cd ../../../../..
-
-# 启动ZED摄像头（独立终端）
-echo "=== 启动ZED摄像头 ==="
-gnome-terminal --title="ZED CAMERA" --working-directory="$PWD" -- \
-  bash -c "source install/setup.bash;
-           echo '=== 启动ZED摄像头 ===';
-           ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zedm;
-           exec bash"
-
-# 等待2秒确保终端启动完成
-sleep 2
-
+cd ../../../..
 
 # 启动ZED摄像头（独立终端）
 echo "=== 启动ZED摄像头 ==="
@@ -90,16 +78,21 @@ gnome-terminal --title="ZED CAMERA" --working-directory="$PWD" -- \
            ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zedm;
            exec bash"
 
+# 等待2秒确保终端启动完成
+
 sleep 2
-cd ../../../../
 
 #启动webrtc
 echo "=== 启动webrtc ==="
-cd ./slave/video/webrtc_pub
+pwd
+cd ./slave
+cd ./video
+cd ./webrtc_pub
 colcon build
+
 gnome-terminal --title="WEB RTC" --working-directory="$PWD" -- \
   bash -c "echo '=== 启动WEB RTC ===';
-           ./start_multi_camera.sh;
+           bash ./start_multi_camera.sh;
            exec bash"
 
 

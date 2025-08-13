@@ -31,7 +31,6 @@ class MotorControlNode(Node):
         # 从消息中提取pitch和yaw值
         pitch_value = msg.x * self.conversion_factor
         yaw_value = msg.y * self.conversion_factor
-        
         self.get_logger().info(
             f"Setting pitch: {int(pitch_value)}, yaw: {int(yaw_value)}",
             throttle_duration_sec=1.0  # 限流，每秒最多打印一次
@@ -40,6 +39,7 @@ class MotorControlNode(Node):
         # 控制电机
         try:
             self.app.motor_mg4010e_set_multi_loop_angle_control2(1, int(pitch_value), 30000)  # ID1: 俯仰
+            
             self.app.motor_mg4010e_set_multi_loop_angle_control2(2, int(yaw_value), 30000)    # ID2: 偏航
         except Exception as e:
             self.get_logger().error(f"Motor control failed: {str(e)}")

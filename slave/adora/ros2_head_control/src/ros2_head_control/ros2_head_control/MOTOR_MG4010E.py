@@ -3,9 +3,14 @@ import time
 import struct
 
 class MOTOR_MG4010E: 
-    def __init__(self, port="/dev/ttyUSB0", baudrate=115200):
+    def __init__(self, port="/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00", baudrate=115200):
         self._ser = None  # 串口对象
         self.serial_opened = False  # 串口状态标志
+        
+        # 添加yaw和pitch跟踪变量
+        self.current_yaw = 0.0      # 当前yaw角度 (度)
+        self.current_pitch = 0.0    # 当前pitch角度 (度)
+        self.motor_positon_read = 0  # 保持原有变量名的兼容性
 
         self.init_serial(port, baudrate)
         self.motor_init()
@@ -35,6 +40,19 @@ class MOTOR_MG4010E:
             print("串口初始化失败:", e)
             self.serial_opened = False
 
+    def get_current_angles(self):
+        """获取当前的yaw和pitch角度"""
+        return {"yaw": self.current_yaw, "pitch": self.current_pitch}
+    
+    def motor_position_read(self):
+        """读取电机位置的方法"""
+        # 读取电机1的位置（pitch）
+        self.motor_mg4010e_read_multi_loop_angle(1)
+        time.sleep(0.01)
+        # 读取电机2的位置（yaw）  
+        self.motor_mg4010e_read_multi_loop_angle(2)
+        time.sleep(0.01)
+
     def run(self):
         self.motor_position_read()
         uart_buffer_data = self._ser.read_all()  
@@ -43,24 +61,62 @@ class MOTOR_MG4010E:
             print("uart_buffer_data < 7")
             return
         
+        # 处理可能的多个数据包
+        i = 0
+        while i < len(uart_buffer_data):
+            # 查找完整的数据包
+            if i + 6 < len(uart_buffer_data):
+                # 检查是否是位置读取的响应包
+                if uart_buffer_data[i] == 0x3E and uart_buffer_data[i+1] == 0x92:
+                    motor_id = uart_buffer_data[i+2]  # 电机ID
+                    
+                    # 获取位置数据 (4字节)
+                    if i + 9 < len(uart_buffer_data):
+                        position_bytes = uart_buffer_data[i+4:i+8]
+                        position_value = int.from_bytes(position_bytes, 'little', signed=True)
+                        
+                        # 转换位置值为角度
+                        angle_degrees = position_value / (10 * 100)  # 转换回角度
+                        
+                        # 根据电机ID打印对应的yaw或pitch值
+                        if motor_id == 1:  # 电机1控制pitch (俯仰)
+                            self.current_pitch = angle_degrees
+                            print(f"从串口获取 PITCH: {angle_degrees:.2f}° (原始值: {position_value})")
+                        elif motor_id == 2:  # 电机2控制yaw (偏航)
+                            self.current_yaw = angle_degrees
+                            print(f"从串口获取 YAW: {angle_degrees:.2f}° (原始值: {position_value})")
+                        else:
+                            print(f"从串口获取 电机ID{motor_id}: {angle_degrees:.2f}° (原始值: {position_value})")
+                        
+                        i += 10  # 跳过这个数据包
+                    else:
+                        i += 1
+                else:
+                    i += 1
+            else:
+                break
+        
+        # 保留原有的数据包处理逻辑作为备用
         tem_bytes = bytearray()
-        tem_bytes.extend(uart_buffer_data[0:7]) #高位存低地址
+        tem_bytes.extend(uart_buffer_data[0:min(7, len(uart_buffer_data))]) #高位存低地址
         tem_bytes_str = ' '.join(f"{b:02X}" for b in tem_bytes)
         print(f"HEX: [{tem_bytes_str}]")
 
-        recives_crc = self.calculate_crc(tem_bytes)
-        if recives_crc:
-            # 打印十六进制和ASCII格式
-            hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
-            crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
-            ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
-            print(f"HEX: [{hex_str}] CRC: [{crc_str}]  ASCII: [{ascii_str}]")
+        if len(uart_buffer_data) >= 7:
+            recives_crc = self.calculate_crc(tem_bytes)
+            if recives_crc:
+                # 打印十六进制和ASCII格式
+                hex_str = ' '.join(f"{b:02X}" for b in uart_buffer_data)
+                crc_str = ' '.join(f"{b:02X}" for b in recives_crc)
+                ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in recives_crc)
+                print(f"HEX: [{hex_str}] CRC: [{crc_str}]  ASCII: [{ascii_str}]")
 
-        if uart_buffer_data[0] == 0x01 and uart_buffer_data[1] == 0x03 and uart_buffer_data[2] == 0x04:
-            position_bytes = bytearray()
-            position_bytes.extend([uart_buffer_data[5], uart_buffer_data[6], uart_buffer_data[3], uart_buffer_data[4]])
-            self.motor_positon_read = int.from_bytes(position_bytes, 'big', signed=True)
-            print("position:", self.motor_positon_read)
+            # 原有的数据解析逻辑 (兼容性保留)
+            if uart_buffer_data[0] == 0x01 and uart_buffer_data[1] == 0x03 and uart_buffer_data[2] == 0x04:
+                position_bytes = bytearray()
+                position_bytes.extend([uart_buffer_data[5], uart_buffer_data[6], uart_buffer_data[3], uart_buffer_data[4]])
+                self.motor_positon_read = int.from_bytes(position_bytes, 'big', signed=True)
+                print("position:", self.motor_positon_read)
 
     def motor_init(self):
         print("motor on ...")
@@ -191,9 +247,35 @@ class MOTOR_MG4010E:
             self._ser.open()
         # 发送数据
         self._ser.write(data_array_1)
+        
+    # 速度控制模式 
+    def motor_speed_control(self, motor_id, speed): #单位0.01dps/LSB
+        data_array_1 = bytearray()
+        data_array_1.extend([0x3E, 0xA2, 0x00, 0x04])  
+        data_array_1[2] = motor_id
+        crc_values = self.calculate_crc(data_array_1) # calculate crc
+        data_array_1.extend([crc_values[0]])
+
+        # int32类型 速度4字节
+        data_array_2 = bytearray()
+        data_array_2.extend([0x00]*4)         
+        data_array_2[0] = speed & 0xff
+        data_array_2[1] = (speed>>8)& 0xff
+        data_array_2[2] = (speed>>16)& 0xff
+        data_array_2[3] = (speed>>24)& 0xff
+        
+        crc_values2 = self.calculate_crc(data_array_2) # calculate crc
+        data_array_2.extend([crc_values2[0]])  
+
+        data_array_1.extend(data_array_2)
+
+        if not self._ser.is_open:
+            self._ser.open()
+        # 发送数据
+        self._ser.write(data_array_1)
 
 if __name__ == "__main__":
-    app = MOTOR_MG4010E(port="/dev/ttyUSB0", baudrate=115200)
+    app = MOTOR_MG4010E(port="/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00", baudrate=115200)
     while True:
         print("Set 0 position")
         app.motor_mg4010e_set_multi_loop_angle_control2(1, 0*10*100, 30000)

@@ -11,6 +11,7 @@ echo "这是VR控制方式的服务端"
 
 # 启动Orbbec摄像头（独立终端）
 cd ./slave/video/camera/orbbecsdk
+colcon build --event-handlers  console_direct+  --cmake-args  -DCMAKE_BUILD_TYPE=Release
 echo "=== 启动Orbbec摄像头 ==="
 gnome-terminal --title="ORBBEC CAMERA" --working-directory="$PWD" -- \
   bash -c ". ./install/setup.bash;
@@ -62,6 +63,7 @@ cd ../..
 # 初始化vr_service（当前终端）
 echo "=== 初始化arm_service ==="
 cd ./slave/VR_service
+colcon build
 #这里得交互一下，来确保can0绑定左臂，所以要改init.sh
 bash ./script/init.sh
 
@@ -83,7 +85,7 @@ gnome-terminal --title="HEAD CONTROL" --working-directory="$PWD" -- \
            exec bash"
 
 # 返回工作空间根目录
-cd ../../../
+cd ../../
 
 
 # 启动RealSense双摄像头（独立终端）
@@ -96,7 +98,7 @@ gnome-terminal --title="REALSENSE CAMERAS" --working-directory="$PWD" -- \
 
 # 等待2秒确保终端启动完成
 sleep 2
-
+cd ../../../..
 
 # 启动ZED摄像头（独立终端）
 echo "=== 启动ZED摄像头 ==="
@@ -106,15 +108,16 @@ gnome-terminal --title="ZED CAMERA" --working-directory="$PWD" -- \
            exec bash"
 
 sleep 2
-cd ../../../../
-
 #启动webrtc
 echo "=== 启动webrtc ==="
-cd ./slave/video/webrtc_pub
+cd ./slave
+cd ./video
+cd ./webrtc_pub
 colcon build
+
 gnome-terminal --title="WEB RTC" --working-directory="$PWD" -- \
   bash -c "echo '=== 启动WEB RTC ===';
-           ./start_multi_camera.sh;
+           bash ./start_multi_camera.sh;
            exec bash"
 
 
