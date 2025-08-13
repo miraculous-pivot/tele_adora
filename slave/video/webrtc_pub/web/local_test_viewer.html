@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>本地WebRTC测试</title>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            font-family: Arial; 
+            background: #1a1a1a;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        video { 
+            width: 100%; 
+            max-width: 800px;
+            height: auto;
+            background: #333;
+            border-radius: 8px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #005a99;
+        }
+        .status {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .info { color: #4fc3f7; }
+        .success { color: #4caf50; }
+        .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 本地WebRTC测试</h1>
+        
+        <div class="controls">
+            <button onclick="connect()">🔗 连接</button>
+            <button onclick="disconnect()">❌ 断开</button>
+            <button onclick="testLocal()">🧪 本地测试</button>
+        </div>
+        
+        <video id="video" autoplay playsinline muted></video>
+        
+        <div class="status" id="status">
+            <div class="info">📱 准备连接...</div>
+        </div>
+    </div>
+
+    <script>
+        let pc = null;
+        let ws = null;
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
+        
+        function log(msg, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            status.innerHTML += `<div class="${color}">[${timestamp}] ${msg}</div>`;
+            status.scrollTop = status.scrollHeight;
+            console.log(msg);
+        }
+        
+        // 本地测试 - 强制使用host候选
+        async function testLocal() {
+            try {
+                log('🧪 开始本地测试...', 'info');
+                
+                pc = new RTCPeerConnection({
+                    iceServers: [], // 不使用STUN服务器，强制本地连接
+                    iceCandidatePoolSize: 0
+                });
+                
+                pc.ontrack = event => {
+                    log('🎥 收到视频流', 'success');
+                    video.srcObject = event.streams[0];
+                };
+                
+                pc.onconnectionstatechange = () => {
+                    log(`📡 连接状态: ${pc.connectionState}`, 
+                        pc.connectionState === 'connected' ? 'success' : 'info');
+                };
+                
+                pc.oniceconnectionstatechange = () => {
+                    log(`🧊 ICE状态: ${pc.iceConnectionState}`, 
+                        pc.iceConnectionState === 'connected' ? 'success' : 'info');
+                };
+                
+                pc.onicecandidate = event => {
+                    if (event.candidate && ws) {
+                        log(`🧊 ICE候选: ${event.candidate.type}`);
+                        ws.send(JSON.stringify({
+                            type: 'ice-candidate',
+                            candidate: event.candidate.candidate,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex,
+                            sdpMid: event.candidate.sdpMid
+                        }));
+                    }
+                };
+                
+                ws = new WebSocket('ws://localhost:8080');
+                
+                ws.onopen = async () => {
+                    log('✅ 信令连接成功', 'success');
+                    
+                    // 只接收视频
+                    pc.addTransceiver('video', { direction: 'recvonly' });
+                    
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    
+                    ws.send(JSON.stringify({
+                        type: 'offer',
+                        sdp: offer.sdp
+                    }));
+                    
+                    log('📤 发送本地Offer');
+                };
+                
+                ws.onmessage = async event => {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'answer' && pc.signalingState === 'have-local-offer') {
+                        log('📥 收到Answer', 'success');
+                        await pc.setRemoteDescription(new RTCSessionDescription({
+                            type: 'answer',
+                            sdp: data.sdp
+                        }));
+                        log('✅ 远程描述已设置', 'success');
+                    }
+                };
+                
+                ws.onerror = error => {
+                    log(`❌ 信令错误: ${error}`, 'error');
+                };
+                
+            } catch (error) {
+                log(`❌ 本地测试失败: ${error}`, 'error');
+            }
+        }
+        
+        async function connect() {
+            try {
+                log('🚀 开始连接...', 'info');
+                
+                pc = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+                
+                let answerReceived = false;
+                
+                pc.ontrack = event => {
+                    log('🎥 收到视频流', 'success');
+                    video.srcObject = event.streams[0];
+                };
+                
+                pc.onconnectionstatechange = () => {
+                    log(`📡 连接状态: ${pc.connectionState}`, 
+                        pc.connectionState === 'connected' ? 'success' : 'info');
+                };
+                
+                pc.oniceconnectionstatechange = () => {
+                    log(`🧊 ICE状态: ${pc.iceConnectionState}`, 
+                        pc.iceConnectionState === 'connected' ? 'success' : 'info');
+                };
+                
+                pc.onicecandidate = event => {
+                    if (event.candidate && ws) {
+                        ws.send(JSON.stringify({
+                            type: 'ice-candidate',
+                            candidate: event.candidate.candidate,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex,
+                            sdpMid: event.candidate.sdpMid
+                        }));
+                        log('🧊 发送ICE候选');
+                    }
+                };
+                
+                ws = new WebSocket('ws://localhost:8080');
+                
+                ws.onopen = async () => {
+                    log('✅ 信令连接成功', 'success');
+                    
+                    pc.addTransceiver('video', { direction: 'recvonly' });
+                    
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    
+                    ws.send(JSON.stringify({
+                        type: 'offer',
+                        sdp: offer.sdp
+                    }));
+                    
+                    log('📤 发送Offer');
+                };
+                
+                ws.onmessage = async event => {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'answer') {
+                        if (answerReceived) {
+                            log('⚠️ 忽略重复的Answer');
+                            return;
+                        }
+                        
+                        if (pc.signalingState !== 'have-local-offer') {
+                            log(`⚠️ 无法设置Answer，当前状态: ${pc.signalingState}`);
+                            return;
+                        }
+                        
+                        log('📥 收到Answer', 'success');
+                        await pc.setRemoteDescription(new RTCSessionDescription({
+                            type: 'answer',
+                            sdp: data.sdp
+                        }));
+                        log('✅ 远程描述已设置', 'success');
+                        answerReceived = true;
+                    }
+                };
+                
+                ws.onerror = error => {
+                    log(`❌ 信令错误: ${error}`, 'error');
+                };
+                
+            } catch (error) {
+                log(`❌ 连接失败: ${error}`, 'error');
+            }
+        }
+        
+        function disconnect() {
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            video.srcObject = null;
+            log('🔌 连接已断开', 'info');
+        }
+        
+        window.addEventListener('beforeunload', disconnect);
+    </script>
+</body>
+</html>

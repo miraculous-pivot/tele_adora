@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbbec相机实时流</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f0f0f0; 
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 1280px;
+            height: 720px;
+            max-width: 100%;
+            background: #000;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 4px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📹 Orbbec相机实时流</h1>
+        
+        <video id="videoElement" autoplay muted playsinline></video>
+        
+        <div class="controls">
+            <button id="connectBtn" onclick="startConnection()">🚀 开始连接</button>
+            <button id="disconnectBtn" onclick="stopConnection()" disabled>⏹️ 断开连接</button>
+        </div>
+        
+        <div id="status" class="status">等待连接...</div>
+        
+        <div class="info">
+            <h3>📊 连接信息：</h3>
+            <p><strong>连接状态：</strong> <span id="connectionState">未连接</span></p>
+            <p><strong>ICE状态：</strong> <span id="iceState">未知</span></p>
+            <p><strong>视频状态：</strong> <span id="videoState">等待视频</span></p>
+        </div>
+    </div>
+
+    <script>
+        let pc = null;
+        let ws = null;
+
+        function updateStatus(message, type = 'connecting') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function updateConnectionInfo(connectionState, iceState, videoState) {
+            document.getElementById('connectionState').textContent = connectionState || '未知';
+            document.getElementById('iceState').textContent = iceState || '未知';
+            document.getElementById('videoState').textContent = videoState || '等待视频';
+        }
+
+        async function startConnection() {
+            try {
+                updateStatus('正在连接到信令服务器...', 'connecting');
+                
+                // 禁用连接按钮
+                document.getElementById('connectBtn').disabled = true;
+                
+                // 创建WebSocket连接
+                ws = new WebSocket('ws://localhost:8080');
+                
+                ws.onopen = () => {
+                    updateStatus('信令服务器已连接，建立WebRTC连接...', 'connecting');
+                    setupWebRTC();
+                };
+                
+                ws.onerror = (error) => {
+                    updateStatus('WebSocket连接错误', 'error');
+                    console.error('WebSocket错误:', error);
+                };
+                
+                ws.onclose = () => {
+                    updateStatus('WebSocket连接已关闭', 'error');
+                };
+
+            } catch (error) {
+                updateStatus('连接失败: ' + error.message, 'error');
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        async function setupWebRTC() {
+            try {
+                // 创建RTCPeerConnection
+                pc = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+
+                // 监听状态变化
+                pc.onconnectionstatechange = () => {
+                    const state = pc.connectionState;
+                    updateConnectionInfo(state, pc.iceConnectionState, '等待视频');
+                    
+                    if (state === 'connected') {
+                        updateStatus('WebRTC连接成功！', 'connected');
+                        document.getElementById('disconnectBtn').disabled = false;
+                    } else if (state === 'failed') {
+                        updateStatus('WebRTC连接失败', 'error');
+                    }
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    const state = pc.iceConnectionState;
+                    updateConnectionInfo(pc.connectionState, state, '等待视频');
+                    
+                    if (state === 'connected') {
+                        updateStatus('ICE连接成功，等待视频流...', 'connecting');
+                    }
+                };
+
+                // 监听远程流
+                pc.ontrack = (event) => {
+                    updateStatus('视频流已连接！', 'connected');
+                    updateConnectionInfo(pc.connectionState, pc.iceConnectionState, '正在播放');
+                    
+                    const video = document.getElementById('videoElement');
+                    if (event.streams && event.streams[0]) {
+                        video.srcObject = event.streams[0];
+                        
+                        video.onloadedmetadata = () => {
+                            console.log(`视频分辨率: ${video.videoWidth}x${video.videoHeight}`);
+                        };
+                        
+                        video.onplay = () => {
+                            updateConnectionInfo(pc.connectionState, pc.iceConnectionState, '正在播放');
+                        };
+                    }
+                };
+
+                // 发送offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                ws.send(JSON.stringify({
+                    type: 'offer',
+                    sdp: offer.sdp
+                }));
+
+                // 处理WebSocket消息
+                ws.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'answer') {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data));
+                            console.log('Answer已接收并设置');
+                        } else if (data.type === 'ice-candidate') {
+                            await pc.addIceCandidate(new RTCIceCandidate({
+                                candidate: data.candidate,
+                                sdpMLineIndex: data.sdpMLineIndex,
+                                sdpMid: data.sdpMid
+                            }));
+                            console.log('ICE候选已添加');
+                        }
+                    } catch (error) {
+                        console.error('处理消息错误:', error);
+                    }
+                };
+
+            } catch (error) {
+                updateStatus('WebRTC设置失败: ' + error.message, 'error');
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        function stopConnection() {
+            updateStatus('正在断开连接...', 'connecting');
+            
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            const video = document.getElementById('videoElement');
+            video.srcObject = null;
+            
+            updateStatus('已断开连接', 'error');
+            updateConnectionInfo('未连接', '未知', '无视频');
+            
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+        }
+
+        // 页面关闭时清理资源
+        window.addEventListener('beforeunload', stopConnection);
+    </script>
+</body>
+</html>

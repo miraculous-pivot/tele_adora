@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 调试版本</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+            background-color: #000;
+            border-radius: 8px;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f1b0b7;
+        }
+        .logs {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+        }
+        .debug-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebRTC 调试版本</h1>
+        
+        <div class="status disconnected" id="status">未连接</div>
+        
+        <div class="controls">
+            <button id="connectBtn" onclick="connect()">开始连接</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>断开连接</button>
+            <button onclick="clearLogs()">清除日志</button>
+        </div>
+        
+        <div class="video-container">
+            <video id="remoteVideo" autoplay muted controls playsinline></video>
+        </div>
+        
+        <div class="debug-info" id="debugInfo">
+            <strong>调试信息：</strong><br>
+            WebSocket状态: <span id="wsStatus">未连接</span><br>
+            PeerConnection状态: <span id="pcStatus">未创建</span><br>
+            ICE连接状态: <span id="iceStatus">未开始</span><br>
+            视频轨道数量: <span id="trackCount">0</span>
+        </div>
+        
+        <div class="logs" id="logs"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let pc = null;
+        
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const statusDiv = document.getElementById('status');
+        const logsDiv = document.getElementById('logs');
+        
+        // 调试信息元素
+        const wsStatusSpan = document.getElementById('wsStatus');
+        const pcStatusSpan = document.getElementById('pcStatus');
+        const iceStatusSpan = document.getElementById('iceStatus');
+        const trackCountSpan = document.getElementById('trackCount');
+        
+        // WebRTC配置
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        function log(message) {
+            console.log(message);
+            const timestamp = new Date().toLocaleTimeString();
+            logsDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function updateStatus(status, className) {
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+        
+        function updateDebugInfo() {
+            wsStatusSpan.textContent = ws ? ws.readyState === WebSocket.OPEN ? '已连接' : '连接中' : '未连接';
+            pcStatusSpan.textContent = pc ? pc.connectionState : '未创建';
+            iceStatusSpan.textContent = pc ? pc.iceConnectionState : '未开始';
+            trackCountSpan.textContent = remoteVideo.srcObject ? remoteVideo.srcObject.getTracks().length : '0';
+        }
+        
+        function clearLogs() {
+            logsDiv.innerHTML = '';
+        }
+
+        async function connect() {
+            try {
+                updateStatus('正在连接...', 'connecting');
+                connectBtn.disabled = true;
+                
+                log('开始连接WebSocket...');
+                ws = new WebSocket('ws://localhost:8080');
+                
+                const connectTimeout = setTimeout(() => {
+                    log('WebSocket连接超时');
+                    updateStatus('连接超时', 'disconnected');
+                    connectBtn.disabled = false;
+                }, 10000);
+                
+                ws.onopen = function() {
+                    clearTimeout(connectTimeout);
+                    log('WebSocket连接成功');
+                    updateStatus('WebSocket已连接', 'connected');
+                    updateDebugInfo();
+                    disconnectBtn.disabled = false;
+                    
+                    // 创建 RTCPeerConnection
+                    createPeerConnection();
+                };
+                
+                ws.onmessage = async function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        log(`收到信令消息: ${message.type}`);
+                        
+                        if (message.type === 'offer') {
+                            await handleOffer(message);
+                        } else if (message.type === 'ice-candidate') {
+                            await handleIceCandidate(message);
+                        } else {
+                            log(`未知消息类型: ${message.type}`);
+                        }
+                    } catch (error) {
+                        log(`处理消息错误: ${error.message}`);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    clearTimeout(connectTimeout);
+                    log(`WebSocket连接关闭: 代码=${event.code}, 原因=${event.reason || '无'}`);
+                    updateStatus('连接已断开', 'disconnected');
+                    updateDebugInfo();
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                };
+                
+                ws.onerror = function(error) {
+                    clearTimeout(connectTimeout);
+                    log(`WebSocket错误: ${error}`);
+                    updateStatus('连接错误', 'disconnected');
+                    updateDebugInfo();
+                    connectBtn.disabled = false;
+                };
+                
+            } catch (error) {
+                log(`连接失败: ${error.message}`);
+                updateStatus('连接失败', 'disconnected');
+                connectBtn.disabled = false;
+            }
+        }
+
+        function createPeerConnection() {
+            try {
+                log('创建RTCPeerConnection...');
+                pc = new RTCPeerConnection(configuration);
+                
+            pc.onicecandidate = function(event) {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    log('发送ICE candidate');
+                    ws.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: {
+                            candidate: event.candidate.candidate,
+                            sdpMid: event.candidate.sdpMid,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex
+                        }
+                    }));
+                } else if (!event.candidate) {
+                    log('ICE candidate收集完成');
+                }
+            };                pc.ontrack = function(event) {
+                    log(`收到远程轨道: ${event.track.kind}, 流数量: ${event.streams.length}`);
+                    if (event.streams.length > 0) {
+                        remoteVideo.srcObject = event.streams[0];
+                        updateStatus('正在接收视频流', 'connected');
+                        log('视频流已设置到video元素');
+                    }
+                    updateDebugInfo();
+                };
+                
+                pc.onconnectionstatechange = function() {
+                    log(`PeerConnection状态变化: ${pc.connectionState}`);
+                    updateDebugInfo();
+                    
+                    if (pc.connectionState === 'connected') {
+                        updateStatus('视频连接已建立', 'connected');
+                    } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                        updateStatus('视频连接断开', 'disconnected');
+                    }
+                };
+                
+                pc.oniceconnectionstatechange = function() {
+                    log(`ICE连接状态变化: ${pc.iceConnectionState}`);
+                    updateDebugInfo();
+                };
+                
+                pc.onsignalingstatechange = function() {
+                    log(`信令状态变化: ${pc.signalingState}`);
+                };
+                
+                log('RTCPeerConnection创建成功');
+                updateDebugInfo();
+                
+            } catch (error) {
+                log(`创建PeerConnection失败: ${error.message}`);
+            }
+        }
+
+        async function handleOffer(message) {
+            try {
+                log('开始处理received offer...');
+                log(`Offer SDP长度: ${message.sdp ? message.sdp.length : '无'}`);
+                
+                if (!pc) {
+                    log('警告: PeerConnection未创建');
+                    return;
+                }
+                
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: message.sdp
+                }));
+                log('RemoteDescription设置成功');
+                
+                const answer = await pc.createAnswer();
+                log('Answer创建成功');
+                
+                await pc.setLocalDescription(answer);
+                log('LocalDescription设置成功');
+                
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'answer',
+                        sdp: answer.sdp
+                    }));
+                    log('Answer已发送');
+                } else {
+                    log('警告: WebSocket未连接，无法发送answer');
+                }
+                
+            } catch (error) {
+                log(`处理offer失败: ${error.message}`);
+                console.error('Offer处理详细错误:', error);
+            }
+        }
+
+        async function handleIceCandidate(message) {
+            try {
+                if (!pc) {
+                    log('警告: 收到ICE candidate但PeerConnection未创建');
+                    return;
+                }
+                
+                if (message.candidate) {
+                    await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+                    log('ICE candidate添加成功');
+                } else {
+                    log('收到空的ICE candidate');
+                }
+            } catch (error) {
+                log(`添加ICE candidate失败: ${error.message}`);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            if (remoteVideo.srcObject) {
+                remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+                remoteVideo.srcObject = null;
+            }
+            
+            updateStatus('已断开连接', 'disconnected');
+            updateDebugInfo();
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            log('所有连接已断开');
+        }
+
+        // 页面关闭时清理资源
+        window.addEventListener('beforeunload', function() {
+            disconnect();
+        });
+        
+        // 定期更新调试信息
+        setInterval(updateDebugInfo, 1000);
+    </script>
+</body>
+</html>

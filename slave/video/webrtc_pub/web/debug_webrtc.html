@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 详细调试界面</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            margin: 20px; 
+            background: #1e1e1e; 
+            color: #f0f0f0; 
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .video-container {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        video {
+            width: 640px;
+            height: 480px;
+            background: #000;
+            border: 2px solid #444;
+            display: block;
+            margin: 0 auto;
+        }
+        .status {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .status-item {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007acc;
+        }
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .log {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            border: 1px solid #444;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log-offer { background: #2d4a2d; }
+        .log-answer { background: #2d2d4a; }
+        .log-ice { background: #4a2d2d; }
+        .log-error { background: #4a1a1a; color: #ff6b6b; }
+        .log-success { background: #1a4a1a; color: #4CAF50; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #2d2d2d;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #61dafb;
+        }
+        .buttons {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WebRTC 详细调试界面</h1>
+        
+        <div class="video-container">
+            <h2>📹 视频流</h2>
+            <video id="videoElement" controls autoplay muted playsinline></video>
+            <div style="text-align: center; margin-top: 10px;">
+                <span id="videoStatus">等待视频流...</span>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button onclick="startConnection()">🚀 开始连接</button>
+            <button onclick="stopConnection()">⏹️ 停止连接</button>
+            <button onclick="clearLog()">🗑️ 清空日志</button>
+            <button onclick="testLocalVideo()">🧪 测试本地视频</button>
+        </div>
+
+        <div class="status">
+            <div class="status-item">
+                <div>连接状态</div>
+                <div class="status-value" id="connectionState">未连接</div>
+            </div>
+            <div class="status-item">
+                <div>ICE状态</div>
+                <div class="status-value" id="iceConnectionState">未知</div>
+            </div>
+            <div class="status-item">
+                <div>信令状态</div>
+                <div class="status-value" id="signalingState">未知</div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div>帧率 (FPS)</div>
+                <div class="stat-value" id="fps">0</div>
+            </div>
+            <div class="stat-box">
+                <div>字节/秒</div>
+                <div class="stat-value" id="bytesPerSecond">0</div>
+            </div>
+            <div class="stat-box">
+                <div>总帧数</div>
+                <div class="stat-value" id="framesReceived">0</div>
+            </div>
+            <div class="stat-box">
+                <div>丢包率 (%)</div>
+                <div class="stat-value" id="packetsLost">0</div>
+            </div>
+        </div>
+
+        <h3>📊 详细日志</h3>
+        <div class="log" id="logContainer"></div>
+    </div>
+
+    <script>
+        let pc = null;
+        let ws = null;
+        let localStream = null;
+        let statsInterval = null;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+
+        function log(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(element, value, color = '#4CAF50') {
+            const el = document.getElementById(element);
+            if (el) {
+                el.textContent = value;
+                el.style.color = color;
+            }
+        }
+
+        function updateVideoStatus(message) {
+            document.getElementById('videoStatus').textContent = message;
+        }
+
+        async function startConnection() {
+            try {
+                log('🚀 开始WebRTC连接', 'info');
+                
+                // 创建WebSocket连接
+                ws = new WebSocket('ws://localhost:8080');
+                
+                ws.onopen = () => {
+                    log('✅ WebSocket连接已建立', 'success');
+                };
+                
+                ws.onerror = (error) => {
+                    log('❌ WebSocket错误: ' + error, 'error');
+                };
+                
+                ws.onclose = () => {
+                    log('📵 WebSocket连接已关闭', 'info');
+                };
+
+                // 创建RTCPeerConnection
+                pc = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+
+                // 监听状态变化
+                pc.onconnectionstatechange = () => {
+                    const state = pc.connectionState;
+                    log(`📡 连接状态: ${state}`, state === 'connected' ? 'success' : 'info');
+                    updateStatus('connectionState', state, 
+                        state === 'connected' ? '#4CAF50' : 
+                        state === 'failed' ? '#f44336' : '#ff9800');
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    const state = pc.iceConnectionState;
+                    log(`🧊 ICE状态: ${state}`, state === 'connected' ? 'success' : 'info');
+                    updateStatus('iceConnectionState', state,
+                        state === 'connected' ? '#4CAF50' : 
+                        state === 'failed' ? '#f44336' : '#ff9800');
+                };
+
+                pc.onsignalingstatechange = () => {
+                    const state = pc.signalingState;
+                    log(`📶 信令状态: ${state}`, 'info');
+                    updateStatus('signalingState', state);
+                };
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log(`🧊 发送ICE候选: ${event.candidate.candidate.substring(0, 50)}...`, 'ice');
+                    } else {
+                        log('🧊 ICE收集完成', 'ice');
+                    }
+                };
+
+                // 监听远程流
+                pc.ontrack = (event) => {
+                    log('📹 收到远程视频流', 'success');
+                    const video = document.getElementById('videoElement');
+                    if (event.streams && event.streams[0]) {
+                        video.srcObject = event.streams[0];
+                        updateVideoStatus('✅ 视频流已连接');
+                        
+                        // 开始统计
+                        startStats();
+                        
+                        video.onloadedmetadata = () => {
+                            log(`📊 视频元数据: ${video.videoWidth}x${video.videoHeight}`, 'success');
+                        };
+                        
+                        video.onplay = () => {
+                            log('▶️ 视频开始播放', 'success');
+                            updateVideoStatus('▶️ 正在播放视频');
+                        };
+                        
+                        video.onerror = (e) => {
+                            log(`❌ 视频播放错误: ${e}`, 'error');
+                            updateVideoStatus('❌ 视频播放错误');
+                        };
+                    }
+                };
+
+                // 等待WebSocket连接
+                await new Promise((resolve, reject) => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        resolve();
+                    } else {
+                        ws.onopen = resolve;
+                        ws.onerror = reject;
+                    }
+                });
+
+                // 发送offer
+                log('🔄 创建并发送Offer', 'offer');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                ws.send(JSON.stringify({
+                    type: 'offer',
+                    sdp: offer.sdp
+                }));
+
+                // 处理WebSocket消息
+                ws.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'answer') {
+                            log('✅ 收到Answer', 'answer');
+                            await pc.setRemoteDescription(new RTCSessionDescription(data));
+                            log('✅ RemoteDescription已设置', 'answer');
+                        }
+                    } catch (error) {
+                        log(`❌ 处理消息错误: ${error}`, 'error');
+                    }
+                };
+
+            } catch (error) {
+                log(`❌ 连接失败: ${error}`, 'error');
+            }
+        }
+
+        function stopConnection() {
+            log('⏹️ 停止连接', 'info');
+            
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+            
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            const video = document.getElementById('videoElement');
+            video.srcObject = null;
+            updateVideoStatus('已断开连接');
+            
+            // 重置状态
+            updateStatus('connectionState', '未连接', '#666');
+            updateStatus('iceConnectionState', '未知', '#666');
+            updateStatus('signalingState', '未知', '#666');
+        }
+
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '';
+        }
+
+        async function testLocalVideo() {
+            try {
+                log('🧪 测试本地摄像头', 'info');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('videoElement');
+                video.srcObject = stream;
+                updateVideoStatus('🧪 本地测试视频');
+                localStream = stream;
+            } catch (error) {
+                log(`❌ 无法访问摄像头: ${error}`, 'error');
+            }
+        }
+
+        function startStats() {
+            if (statsInterval) clearInterval(statsInterval);
+            
+            statsInterval = setInterval(async () => {
+                if (!pc) return;
+                
+                try {
+                    const stats = await pc.getStats();
+                    let framesReceived = 0;
+                    let bytesReceived = 0;
+                    let packetsLost = 0;
+                    let packetsReceived = 0;
+                    
+                    stats.forEach((report) => {
+                        if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                            framesReceived = report.framesReceived || 0;
+                            bytesReceived = report.bytesReceived || 0;
+                            packetsLost = report.packetsLost || 0;
+                            packetsReceived = report.packetsReceived || 0;
+                        }
+                    });
+                    
+                    // 计算帧率
+                    const now = Date.now();
+                    const timeDiff = (now - lastFrameTime) / 1000;
+                    const frameDiff = framesReceived - frameCount;
+                    const fps = timeDiff > 0 ? Math.round(frameDiff / timeDiff) : 0;
+                    
+                    // 计算丢包率
+                    const totalPackets = packetsReceived + packetsLost;
+                    const lossRate = totalPackets > 0 ? Math.round((packetsLost / totalPackets) * 100) : 0;
+                    
+                    document.getElementById('fps').textContent = fps;
+                    document.getElementById('bytesPerSecond').textContent = Math.round(bytesReceived / 1024);
+                    document.getElementById('framesReceived').textContent = framesReceived;
+                    document.getElementById('packetsLost').textContent = lossRate;
+                    
+                    frameCount = framesReceived;
+                    lastFrameTime = now;
+                    
+                } catch (error) {
+                    console.error('获取统计信息错误:', error);
+                }
+            }, 1000);
+        }
+
+        // 页面关闭时清理资源
+        window.addEventListener('beforeunload', () => {
+            stopConnection();
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        log('🌟 调试界面已加载，点击"开始连接"按钮测试WebRTC', 'success');
+    </script>
+</body>
+</html>
