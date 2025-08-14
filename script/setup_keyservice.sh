@@ -172,7 +172,7 @@ cd ../../../
 # 启动RealSense双摄像头（独立终端）
 echo "=== 启动RealSense双摄像头 ==="
 cd ./slave/video/camera/librealsense
-run_service "REALSENSE CAMERAS" "$PWD" "source install/setup.bash; ros2 launch realsense2_camera rs_dual_camera_launch.py serial_no1:=_130322271114 serial_no2:=_130322271127; exec bash"
+run_service "REALSENSE CAMERAS" "$PWD" "source install/setup.bash; ros2 launch realsense2_camera rs_dual_camera_launch.py serial_no1:=_130322272642 serial_no2:=_130322270912; exec bash"
 cd ../../../../
 
 # 启动Orbbec摄像头（独立终端）

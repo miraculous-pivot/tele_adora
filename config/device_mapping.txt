@@ -1,8 +1,8 @@
 # 设备映射配置文件
-# 自动生成于 2025年 08月 14日 星期四 16:59:33 CST
+# 自动生成于 2025年 08月 14日 星期四 22:26:04 CST
 
-HEAD_CONTROL_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C020471-if00
-CHASSIS_CONTROL_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027999-if00
-LIFTING_MOTOR_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A7B036044-if00
+HEAD_CONTROL_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021240-if00
+CHASSIS_CONTROL_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027399-if00
+LIFTING_MOTOR_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C028041-if00
 SUCTION_PUMP_ENABLED=true
-SUCTION_PUMP_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C020865-if00
+SUCTION_PUMP_PORT=/dev/serial/by-id/usb-1a86_USB_Single_Serial_5A7B025838-if00

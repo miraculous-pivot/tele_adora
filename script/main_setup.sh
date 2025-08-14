@@ -221,7 +221,7 @@ run_head_calibration() {
     print_info "启动云台零点校准..."
     
     # 云台校准脚本路径（使用测试版本）
-    CALIBRATION_SCRIPT="../slave/adora/ros2_head_control/head_calibration_test.py"
+    CALIBRATION_SCRIPT="../slave/adora/ros2_head_control/head_zero_calibration.py"
     
     if [ ! -f "$CALIBRATION_SCRIPT" ]; then
         print_error "云台校准脚本不存在: $CALIBRATION_SCRIPT"

@@ -25,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'head_control = ros2_head_control.head_control_node:main',
-            'motor_status = ros2_head_control.motor_status_node:main',
         ],
     },
 )

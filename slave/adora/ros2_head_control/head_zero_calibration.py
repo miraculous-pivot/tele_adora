@@ -168,8 +168,15 @@ YAW_ZERO_OFFSET={yaw_offset:.2f}
         print(f"\n请将云台调整到你希望的零点位置")
         print(f"- Pitch轴（俯仰）: 通常为水平位置")
         print(f"- Yaw轴（偏航）: 通常为正前方")
-        print(f"\n调整完成后按回车继续...")
+        print(f"\n调整完成后按回车开始10秒倒计时...")
         input()
+        
+        # 10秒倒计时
+        print(f"\n开始10秒倒计时，请保持云台在零点位置:")
+        for i in range(10, 0, -1):
+            print(f"⏰ {i} 秒后读取零点位置...", end='\r')
+            time.sleep(1)
+        print("\n正在读取零点位置...")
         
         # 读取当前位置
         pitch_pos, yaw_pos = self.read_current_position()
@@ -183,7 +190,7 @@ YAW_ZERO_OFFSET={yaw_offset:.2f}
         
         # 确认保存
         while True:
-            choice = input(f"\n是否将当前位置设置为零点? (y/N): ").strip().lower()
+            choice = input(f"\n是否将10秒后读取的位置设置为零点? (y/N): ").strip().lower()
             if choice in ['y', 'yes']:
                 # 将当前位置设为零点，意味着偏移量就是当前读取值
                 if self.save_zero_config(pitch_pos, yaw_pos):
