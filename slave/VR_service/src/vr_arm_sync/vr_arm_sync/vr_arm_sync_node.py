@@ -160,7 +160,7 @@ class VRArmSyncNode(Node):
         # 发布底盘速度控制指令
         self.chassis_velocity_pub = self.create_publisher(
             Twist,
-            '/adora_robot/chassis/velocity_ctrl',
+            '/dt/velocity_ctrl',
             10
         )
         

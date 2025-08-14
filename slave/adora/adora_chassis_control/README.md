@@ -34,7 +34,7 @@ ros2 launch adora_chassis_bringup adora_a2_max_ros2.launch.py
 将遥控器SWB 摇杆拨到中间位置进入上位机遥控模式。 然后，新建终端，通过ROS话题向/adora_robot/chassis/cmd_vel 话题发布数据 控制小车移动（注意 将遥控器左上角拨码开关拨到最上，表示开启自动驾驶模式）
 
 ```
-ros2 topic pub -r 10 /adora_robot/chassis/velocity_ctrl geometry_msgs/msg/Twist "{
+ros2 topic pub -r 10 /dt/velocity_ctrl geometry_msgs/msg/Twist "{
   linear: {x: 0.0, y: 0.0, z: 0.0},
   angular: {x: 0.0, y: 0.0, z: 0.5}
 }"

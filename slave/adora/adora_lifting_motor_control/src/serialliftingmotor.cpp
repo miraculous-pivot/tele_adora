@@ -84,7 +84,7 @@ public:
         // 比较两个字符数组，最多比较 LEN 个字符
         if (robot_name.length() >= 12)
         {
-            if (((strncmp(robot_name.c_str(), "ADORA_A2_MAX", 12) == 0) && (max_lifting_distance == 700)) ||
+            if (((strncmp(robot_name.c_str(), "ADORA_A2_MAX", 12) == 0) && (max_lifting_distance == 850)) ||
                 ((strncmp(robot_name.c_str(), "ADORA_A2_PRO", 12) == 0) && (max_lifting_distance == 1100)))
             {
                 RCLCPP_INFO_STREAM(this->get_logger(), "robot_name:    " << robot_name);

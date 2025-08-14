@@ -37,7 +37,7 @@ def generate_launch_description():
                 ('/adora_robot/chassis/odom_info',              '/adora_robot/chassis/odom_info'),
 
                 # sub: old, new
-                ('/adora_robot/chassis/velocity_ctrl',       '/adora_robot/chassis/velocity_ctrl'),
+                ('/dt/velocity_ctrl',                    '/adora_robot/chassis/velocity_ctrl'),
                 ('/adora_robot/chassis/speed_ctrl',          '/adora_robot/chassis/speed_ctrl'),
                 ('/adora_robot/chassis/stop_ctrl',           '/adora_robot/chassis/stop_ctrl'),
                 ('/adora_robot/chassis/collision_clean',     '/adora_robot/chassis/collision_clean'),

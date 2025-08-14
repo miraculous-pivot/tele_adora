@@ -11,7 +11,7 @@ def generate_launch_description():
             parameters=[
                 {'dev': '/dev/serial/by-id/usb-1a86_USB_Single_Serial_56D0001775-if00'},
                 {'baud': 19200},
-                {'max_lifting_distance': 700},
+                {'max_lifting_distance': 850},
                 {'robot_name': 'ADORA_A2_MAX'},
                 {'sub_cmdvel_topic': '/adora/lifting_motor/cmd'},
                 {'pub_position_topic': '/adora/lifting_motor/states'}

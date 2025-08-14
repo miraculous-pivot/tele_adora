@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cd ..
 echo "这是key board控制方式的控制端"
 cd ./leader/key_board
 colcon build 

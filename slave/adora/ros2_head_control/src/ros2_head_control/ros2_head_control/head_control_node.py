@@ -10,9 +10,17 @@ class MotorControlNode(Node):
     def __init__(self):
         super().__init__('motor_control_node')
         
+        # 声明参数
+        self.declare_parameter('port', '/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00')
+        self.declare_parameter('baudrate', 115200)
+        
+        # 获取参数
+        port = self.get_parameter('port').value
+        baudrate = self.get_parameter('baudrate').value
+        
         # 初始化电机控制器
-        self.get_logger().info("Initializing MOTOR_MG4010E controller")
-        self.app = MOTOR_MG4010E(port='/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00', baudrate=115200)
+        self.get_logger().info(f"Initializing MOTOR_MG4010E controller - Port: {port}, Baudrate: {baudrate}")
+        self.app = MOTOR_MG4010E(port=port, baudrate=baudrate)
         
         # 创建订阅者
         self.subscription = self.create_subscription(
@@ -26,11 +34,12 @@ class MotorControlNode(Node):
         
         # 参数
         self.conversion_factor = 57.3 * 10 * 100  # 弧度转控制单位
+        self.zero_offset = 180 * 10 * 100  # 零点偏移180度
     
     def angle_callback(self, msg):
         # 从消息中提取pitch和yaw值
         pitch_value = msg.x * self.conversion_factor
-        yaw_value = msg.y * self.conversion_factor
+        yaw_value = msg.y * self.conversion_factor + self.zero_offset
         self.get_logger().info(
             f"Setting pitch: {int(pitch_value)}, yaw: {int(yaw_value)}",
             throttle_duration_sec=1.0  # 限流，每秒最多打印一次

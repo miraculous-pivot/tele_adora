@@ -15,8 +15,8 @@ RIGHT_ARM_CAN = "can1"
 # 你需要根据实际情况调整这些缩放比例
 # POS_SCALE_FACTOR = 10000000  # 1m -> 1000 units
 # ROT_SCALE_FACTOR = 1000000 # 1rad -> 1000 units
-POS_SCALE_FACTOR = 50000  # 1m -> 1000 units
-ROT_SCALE_FACTOR = 50000 # 1rad -> 1000 units
+POS_SCALE_FACTOR = 20000  # 1m -> 1000 units
+ROT_SCALE_FACTOR = 10000 # 1rad -> 1000 units
 
 class ArmControllerNode(Node):
     def __init__(self):
@@ -27,20 +27,20 @@ class ArmControllerNode(Node):
         self.left_arm = self.initialize_arm(LEFT_ARM_CAN, "Left")
         self.right_arm = self.initialize_arm(RIGHT_ARM_CAN, "Right")
         self.left_arm_pose = {
-                'joint_1': int(0.2 * POS_SCALE_FACTOR),
-                'joint_2': int(0.2 * POS_SCALE_FACTOR),
-                'joint_3': int(-0.2 * POS_SCALE_FACTOR),
-                'joint_4': int(0.3 * ROT_SCALE_FACTOR),
-                'joint_5': int(-0.2 * ROT_SCALE_FACTOR),
-                'joint_6': int(0.5 * ROT_SCALE_FACTOR),
+                'joint_1': int(0 * POS_SCALE_FACTOR),
+                'joint_2': int(0 * POS_SCALE_FACTOR),
+                'joint_3': int(0 * POS_SCALE_FACTOR),
+                'joint_4': int(0 * ROT_SCALE_FACTOR),
+                'joint_5': int(0 * ROT_SCALE_FACTOR),
+                'joint_6': int(0 * ROT_SCALE_FACTOR),
             }
         self.right_arm_pose = {
-                'joint_1': int(0.2 * POS_SCALE_FACTOR),
-                'joint_2': int(0.2 * POS_SCALE_FACTOR),
-                'joint_3': int(-0.2 * POS_SCALE_FACTOR),
-                'joint_4': int(0.3 * ROT_SCALE_FACTOR),
-                'joint_5': int(-0.2 * ROT_SCALE_FACTOR),
-                'joint_6': int(0.5 * ROT_SCALE_FACTOR),
+                'joint_1': int(0 * POS_SCALE_FACTOR),
+                'joint_2': int(0 * POS_SCALE_FACTOR),
+                'joint_3': int(0 * POS_SCALE_FACTOR),
+                'joint_4': int(0 * ROT_SCALE_FACTOR),
+                'joint_5': int(0 * ROT_SCALE_FACTOR),
+                'joint_6': int(0 * ROT_SCALE_FACTOR),
             }
         # --- 创建订阅者 ---
         if self.left_arm:
@@ -80,7 +80,7 @@ class ArmControllerNode(Node):
                     raise RuntimeError(f"Failed to enable {arm_id} Arm: Timeout")
             
             # 设置为末端位姿控制模式
-            arm.MotionCtrl_2(ctrl_mode=0x01, move_mode=0x00)
+            arm.MotionCtrl_2(0x01, 0x01, 100, 0x00)
             self.get_logger().info(f"{arm_id} Arm Initialized Successfully.")
             return arm
         except Exception as e:
@@ -113,6 +113,27 @@ class ArmControllerNode(Node):
                     }
             time.sleep(0.01)
         return None
+    def get_current_joint_angles(self, arm: C_PiperInterface_V2):
+        """从Piper SDK获取当前关节角"""
+        if not arm:
+            return None
+        for _ in range(3):
+            joint_msg = arm.GetArmJointMsgs()
+            if joint_msg and hasattr(joint_msg, 'joint_state') and joint_msg.joint_state:
+                joint_ctrl_obj = joint_msg.joint_state
+                if hasattr(joint_ctrl_obj, 'joint_1'):
+                    return {
+                        'joint_1': joint_ctrl_obj.joint_1,
+                        'joint_2': joint_ctrl_obj.joint_2,
+                        'joint_3': joint_ctrl_obj.joint_3,
+                        'joint_4': joint_ctrl_obj.joint_4,
+                        'joint_5': joint_ctrl_obj.joint_5,
+                        'joint_6': joint_ctrl_obj.joint_6,
+                        'timestamp': joint_msg.time_stamp,
+                        'Hz': joint_msg.Hz
+                    }
+            time.sleep(0.01)
+        return None
 
     def left_arm_callback(self, msg: Pose):
         if not self.left_arm:
@@ -121,7 +142,7 @@ class ArmControllerNode(Node):
         with self.left_lock:
             # 在每次控制前获取最新的位姿
             # current_pose = self.get_current_pose(self.left_arm)
-            
+            current_joint = self.get_current_joint_angles(self.left_arm)
             # 如果无法获取当前位姿，则放弃本次控制
             # if not current_pose:
             #     self.get_logger().warn("Left arm callback skipped: Could not get current pose.")
@@ -137,12 +158,12 @@ class ArmControllerNode(Node):
             #     'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
             # }
             self.left_arm_pose = {
-                'joint_1': self.left_arm_pose['joint_1'] + int(msg.position.x * POS_SCALE_FACTOR),
-                'joint_2': self.left_arm_pose['joint_2'] + int(msg.position.y * POS_SCALE_FACTOR),
-                'joint_3': self.left_arm_pose['joint_3'] + int(msg.position.z * POS_SCALE_FACTOR),
-                'joint_4': self.left_arm_pose['joint_4'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
-                'joint_5': self.left_arm_pose['joint_5'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
-                'joint_6': self.left_arm_pose['joint_6'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+                'joint_1': current_joint['joint_1'] + int(msg.position.x * 57295.7795),
+                'joint_2': current_joint['joint_2'] + int(msg.position.y * 57295.7795),
+                'joint_3': current_joint['joint_3'] + int(msg.position.z * 57295.7795),
+                'joint_4': current_joint['joint_4'] + int(msg.orientation.x * 57295.7795),
+                'joint_5': current_joint['joint_5'] + int(msg.orientation.y * 57295.7795),
+                'joint_6': current_joint['joint_6'] + int(msg.orientation.z * 57295.7795),
             }
             print(self.left_arm_pose)
             print("1")
@@ -173,7 +194,7 @@ class ArmControllerNode(Node):
         with self.right_lock:
             # 在每次控制前获取最新的位姿
             # current_pose = self.get_current_pose(self.right_arm)
-
+            current_joint = self.get_current_joint_angles(self.right_arm)
             # 如果无法获取当前位姿，则放弃本次控制
             # if not current_pose:
             #     self.get_logger().warn("Right arm callback skipped: Could not get current pose.")
@@ -189,12 +210,12 @@ class ArmControllerNode(Node):
             #     'RZ': current_pose['RZ'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
             # }
             self.right_arm_pose = {
-                'joint_1': self.right_arm_pose['joint_1'] + int(msg.position.x * POS_SCALE_FACTOR),
-                'joint_2': self.right_arm_pose['joint_2'] + int(msg.position.y * POS_SCALE_FACTOR),
-                'joint_3': self.right_arm_pose['joint_3'] + int(msg.position.z * POS_SCALE_FACTOR),
-                'joint_4': self.right_arm_pose['joint_4'] + int(msg.orientation.x * ROT_SCALE_FACTOR),
-                'joint_5': self.right_arm_pose['joint_5'] + int(msg.orientation.y * ROT_SCALE_FACTOR),
-                'joint_6': self.right_arm_pose['joint_6'] + int(msg.orientation.z * ROT_SCALE_FACTOR),
+                'joint_1': current_joint['joint_1'] + int(msg.position.x * 57295.7795),
+                'joint_2': current_joint['joint_2'] + int(msg.position.y * 57295.7795),
+                'joint_3': current_joint['joint_3'] + int(msg.position.z * 57295.7795),
+                'joint_4': current_joint['joint_4'] + int(msg.orientation.x * 57295.7795),
+                'joint_5': current_joint['joint_5'] + int(msg.orientation.y * 57295.7795),
+                'joint_6': current_joint['joint_6'] + int(msg.orientation.z * 57295.7795),
             }
             print(self.right_arm_pose)
             print("2")

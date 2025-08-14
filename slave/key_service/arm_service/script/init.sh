@@ -8,6 +8,71 @@ set -e
 echo "===== 交互式CAN接口管理脚本 ====="
 echo ""
 
+# 函数：用户选择菜单
+show_initialization_menu() {
+    echo "请选择操作模式："
+    echo "1. 完整初始化 (包含USB插拔步骤)"
+    echo "2. 跳过初始化 (直接检查现有配置)"
+    echo "3. 仅检查版本信息"
+    echo ""
+    
+    while true; do
+        read -p "请输入选择 (1-3): " choice
+        case $choice in
+            1)
+                echo "已选择: 完整初始化模式"
+                return 1  # 完整初始化
+                ;;
+            2)
+                echo "已选择: 跳过初始化模式"
+                return 2  # 跳过初始化
+                ;;
+            3)
+                echo "已选择: 仅检查版本"
+                return 3  # 仅检查版本
+                ;;
+            *)
+                echo "无效选择，请输入 1、2 或 3"
+                ;;
+        esac
+    done
+}
+
+# 函数：检查现有CAN配置
+check_existing_configuration() {
+    echo "正在检查现有CAN配置..."
+    
+    # 检查can0和can1是否存在且已激活
+    local can0_status=$(ip link show can0 2>/dev/null | grep -o "UP" || echo "DOWN")
+    local can1_status=$(ip link show can1 2>/dev/null | grep -o "UP" || echo "DOWN")
+    
+    echo "CAN接口状态检查："
+    if [ "$can0_status" = "UP" ]; then
+        echo "✓ can0: 已激活"
+    else
+        echo "❌ can0: 未激活或不存在"
+    fi
+    
+    if [ "$can1_status" = "UP" ]; then
+        echo "✓ can1: 已激活"
+    else
+        echo "❌ can1: 未激活或不存在"
+    fi
+    
+    # 检测当前连接的USB设备
+    detect_can_ports
+    
+    if [ "$can0_status" = "UP" ] && [ "$can1_status" = "UP" ]; then
+        echo ""
+        echo "✓ 检测到完整的CAN配置，可以直接使用"
+        return 0
+    else
+        echo ""
+        echo "⚠️  CAN配置不完整，建议进行完整初始化"
+        return 1
+    fi
+}
+
 # 函数：检测CAN接口
 detect_can_ports() {
     echo "正在扫描CAN接口..."
@@ -66,6 +131,52 @@ wait_for_can_interfaces() {
     done
 }
 
+# 显示菜单并获取用户选择
+set +e  # 临时关闭错误退出
+show_initialization_menu
+USER_CHOICE=$?
+set -e  # 重新启用错误退出
+
+case $USER_CHOICE in
+    3)
+        echo "跳转到版本检查..."
+        echo ""
+        echo "步骤: 检查设备版本信息..."
+        bash ./script/version_check.sh
+        echo ""
+        echo "===== 版本检查完成 ====="
+        exit 0
+        ;;
+    2)
+        echo "检查现有配置..."
+        if check_existing_configuration; then
+            echo ""
+            echo "步骤: 显示网络接口状态..."
+            ifconfig
+            echo ""
+            echo "步骤: 检查设备版本信息..."
+            bash ./script/version_check.sh
+            echo ""
+            echo "===== 现有配置检查完成 ====="
+            exit 0
+        else
+            echo ""
+            read -p "配置不完整，是否继续完整初始化？(y/n): " continue_init
+            if [[ $continue_init =~ ^[Yy]$ ]]; then
+                echo "继续完整初始化..."
+            else
+                echo "操作已取消"
+                exit 0
+            fi
+        fi
+        ;;
+    1)
+        echo "开始完整初始化..."
+        ;;
+esac
+
+echo ""
+
 # 初始检查
 echo "步骤1: 初始化检查..."
 detect_can_ports
@@ -92,6 +203,8 @@ if [ "$initial_count" -gt 0 ]; then
     done
 else
     echo "✓ 当前未检测到CAN接口"
+    echo ""
+    wait_for_user_confirmation "为确保完整初始化，请确保所有USB转CAN设备已拔掉，然后按回车键继续..."
 fi
 
 echo ""

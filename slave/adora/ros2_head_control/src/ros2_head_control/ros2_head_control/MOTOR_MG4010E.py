@@ -79,10 +79,10 @@ class MOTOR_MG4010E:
                         angle_degrees = position_value / (10 * 100)  # 转换回角度
                         
                         # 根据电机ID打印对应的yaw或pitch值
-                        if motor_id == 1:  # 电机1控制pitch (俯仰)
+                        if motor_id == 2:  # 电机1控制pitch (俯仰)
                             self.current_pitch = angle_degrees
                             print(f"从串口获取 PITCH: {angle_degrees:.2f}° (原始值: {position_value})")
-                        elif motor_id == 2:  # 电机2控制yaw (偏航)
+                        elif motor_id == 1:  # 电机2控制yaw (偏航)
                             self.current_yaw = angle_degrees
                             print(f"从串口获取 YAW: {angle_degrees:.2f}° (原始值: {position_value})")
                         else:
@@ -281,5 +281,5 @@ if __name__ == "__main__":
         app.motor_mg4010e_set_multi_loop_angle_control2(1, 0*10*100, 30000)
         time.sleep(30)  
         print("Set 270 position") 
-        app.motor_mg4010e_set_multi_loop_angle_control2(1, 270*10*100, 30000)
+        app.motor_mg4010e_set_multi_loop_angle_control2(2, 270*10*100, 30000)
         time.sleep(30)
