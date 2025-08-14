@@ -52,14 +52,22 @@ script_files=(
     "./script/setup_keyboard.sh"
     "./script/setup_keyservice.sh"
     "./script/setup_vrservice.sh"
+    "./script/setup_vrservice_backup.sh"
     "./script/fix_dbus.sh"
     "./script/test_confirm.sh"
     "./script/test_vr_init.sh"
     "./script/test_terminal_params.sh"
     "./script/device_identification.sh"
+    "./script/device_config.sh"
     "./script/load_device_config.sh"
     "./script/demo_device_config.sh"
     "./script/test_start_menu.sh"
+    "./script/test_auto_permissions.sh"
+    "./script/test_chmod_sharing.sh"
+    "./script/test_device_comprehensive.sh"
+    "./script/test_device_config.sh"
+    "./script/test_launch_files.sh"
+    "./script/test_permissions.sh"
 )
 
 output ""
@@ -67,9 +75,6 @@ output "=== script 目录脚本 ==="
 for file in "${script_files[@]}"; do
     set_executable "$file" && ((success_count++)) || ((error_count++))
 done
-
-# 测试脚本
-set_executable "./script/test_permissions.sh" && ((success_count++)) || ((error_count++))
 
 output ""
 output "=== leader 目录脚本 ==="
@@ -135,6 +140,20 @@ dev_files=(
 )
 
 for file in "${dev_files[@]}"; do
+    if [ -f "$file" ]; then
+        set_executable "$file" && ((success_count++)) || ((error_count++))
+    fi
+done
+
+output ""
+output "=== 云台校准脚本 ==="
+# 云台校准相关脚本
+head_calibration_files=(
+    "./slave/adora/ros2_head_control/head_zero_calibration.py"
+    "./slave/adora/ros2_head_control/head_calibration_test.py"
+)
+
+for file in "${head_calibration_files[@]}"; do
     if [ -f "$file" ]; then
         set_executable "$file" && ((success_count++)) || ((error_count++))
     fi

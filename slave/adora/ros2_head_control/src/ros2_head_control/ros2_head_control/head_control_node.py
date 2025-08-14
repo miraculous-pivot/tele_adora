@@ -5,6 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Point
 from .MOTOR_MG4010E import MOTOR_MG4010E
 import math
+import os
 
 class MotorControlNode(Node):
     def __init__(self):
@@ -34,14 +35,46 @@ class MotorControlNode(Node):
         
         # 参数
         self.conversion_factor = 57.3 * 10 * 100  # 弧度转控制单位
-        self.zero_offset = 180 * 10 * 100  # 零点偏移180度
+        
+        # 从配置文件加载零点偏移
+        self.pitch_zero_offset, self.yaw_zero_offset = self.load_zero_config()
+        self.get_logger().info(f"Loaded zero offsets - Pitch: {self.pitch_zero_offset:.2f}°, Yaw: {self.yaw_zero_offset:.2f}°")
+    
+    def load_zero_config(self):
+        """从配置文件加载零点偏移"""
+        # 使用相对于当前文件的路径
+        current_dir = os.path.dirname(os.path.dirname(__file__))  # 返回到ros2_head_control目录
+        config_file = os.path.join(current_dir, "..", "..", "config", "head_zero_config.txt")
+        config_file = os.path.abspath(config_file)  # 转换为绝对路径以避免相对路径问题
+        
+        pitch_offset = 0.0  # 默认pitch零点偏移
+        yaw_offset = 180.0  # 默认yaw零点偏移
+        
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('PITCH_ZERO_OFFSET='):
+                            pitch_offset = float(line.split('=', 1)[1])
+                        elif line.startswith('YAW_ZERO_OFFSET='):
+                            yaw_offset = float(line.split('=', 1)[1])
+                            
+                self.get_logger().info(f"Zero config loaded from: {config_file}")
+            except Exception as e:
+                self.get_logger().warn(f"Failed to load zero config: {e}, using defaults")
+        else:
+            self.get_logger().warn(f"Zero config file not found: {config_file}, using defaults")
+        
+        return pitch_offset, yaw_offset
     
     def angle_callback(self, msg):
-        # 从消息中提取pitch和yaw值
-        pitch_value = msg.x * self.conversion_factor
-        yaw_value = msg.y * self.conversion_factor + self.zero_offset
+        # 从消息中提取pitch和yaw值，并应用零点偏移
+        pitch_value = (msg.x + self.pitch_zero_offset * math.pi / 180) * self.conversion_factor
+        yaw_value = (msg.y + self.yaw_zero_offset * math.pi / 180) * self.conversion_factor
+        
         self.get_logger().info(
-            f"Setting pitch: {int(pitch_value)}, yaw: {int(yaw_value)}",
+            f"Setting pitch: {int(pitch_value)}, yaw: {int(yaw_value)} (with zero offsets)",
             throttle_duration_sec=1.0  # 限流，每秒最多打印一次
         )
         

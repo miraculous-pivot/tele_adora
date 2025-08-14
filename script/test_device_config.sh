@@ -8,10 +8,12 @@ echo ""
 
 # 测试1: 检查配置文件是否存在
 test_config_file() {
-    echo "测试1: 检查设备配置文件"
-    echo "========================"
+    echo "=== 测试配置文件处理 ==="
     
-    local config_file="/home/feng/tele_adora/config/device_mapping.txt"
+    # 获取脚本所在目录的绝对路径
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$(cd "$script_dir/.." && pwd)"
+    local config_file="$project_root/config/device_mapping.txt"
     
     if [ -f "$config_file" ]; then
         echo "✓ 配置文件存在: $config_file"

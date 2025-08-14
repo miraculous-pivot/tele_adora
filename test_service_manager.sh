@@ -1,22 +1,24 @@
 #!/bin/bash
 
-# 服务管理功能测试脚本
+# 服务管理器测试脚本
 
-echo "=== 测试服务管理功能 ==="
-echo ""
+# 获取脚本所在目录的绝对路径  
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 测试1: 检查脚本权限
-echo "1. 检查脚本权限..."
-if [ -x "/home/feng/tele_adora/service_manager.sh" ]; then
-    echo "   ✅ service_manager.sh 权限正确"
+echo "=== Service Manager 测试 ==="
+
+# 检查 service_manager.sh 是否存在且可执行
+if [ -x "$SCRIPT_DIR/service_manager.sh" ]; then
+    echo "✓ service_manager.sh 存在且可执行"
 else
-    echo "   ❌ service_manager.sh 权限不正确"
+    echo "✗ service_manager.sh 不存在或不可执行"
 fi
 
-if [ -x "/home/feng/tele_adora/stop.sh" ]; then
-    echo "   ✅ stop.sh 权限正确"
+# 检查 stop.sh 是否存在且可执行
+if [ -x "$SCRIPT_DIR/stop.sh" ]; then
+    echo "✓ stop.sh 存在且可执行"
 else
-    echo "   ❌ stop.sh 权限不正确"
+    echo "✗ stop.sh 不存在或不可执行"
 fi
 
 echo ""
@@ -33,12 +35,12 @@ sleep 1
 
 # 测试3: 检查服务状态
 echo "3. 测试服务状态查询..."
-bash /home/feng/tele_adora/service_manager.sh status
+bash "$SCRIPT_DIR/service_manager.sh" status
 echo ""
 
 # 测试4: 测试日志查看
 echo "4. 测试日志查看..."
-bash /home/feng/tele_adora/service_manager.sh logs
+bash "$SCRIPT_DIR/service_manager.sh" logs
 echo ""
 
 # 测试5: 停止测试服务

@@ -3,7 +3,9 @@
 # 多相机HTTP流启动脚本
 # 启动根据用户指定配置的4路相机HTTP MJPEG流服务
 
-WORKSPACE="/home/feng/tele_adora/slave/video/webrtc_pub"
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="$SCRIPT_DIR"
 LAUNCH_FILE="specified_multi_camera.launch.py"
 
 # 颜色定义

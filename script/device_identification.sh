@@ -3,7 +3,10 @@
 # 设备识别和配置脚本
 # 用于识别串口设备并保存配置映射
 
-DEVICE_CONFIG_FILE="/home/feng/tele_adora/config/device_mapping.txt"
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEVICE_CONFIG_FILE="$PROJECT_ROOT/config/device_mapping.txt"
 
 # 创建配置目录
 mkdir -p "$(dirname "$DEVICE_CONFIG_FILE")"
@@ -98,16 +101,16 @@ check_existing_config() {
         echo ""
         
         while true; do
-            read -p "是否要重新配置所有设备? (y/N): " choice
+            read -p "是否要重新配置所有设备? (Y/n): " choice
             case "$choice" in
-                [Yy]|[Yy][Ee][Ss])
-                    return 1  # 重新配置
+                [Yy]|[Yy][Ee][Ss]|"")
+                    return 1  # 重新配置（默认选择）
                     ;;
-                [Nn]|[Nn][Oo]|"")
+                [Nn]|[Nn][Oo])
                     return 0  # 使用现有配置
                     ;;
                 *)
-                    echo "请输入 y 或 n"
+                    echo "请输入 y 或 n (默认为 y)"
                     ;;
             esac
         done

@@ -143,13 +143,13 @@ run_service "CHASSIS CONTROL" "$PWD" "source install/setup.bash; echo '=== 启�
 sleep 2
 
 # 启动云台控制模块（独立终端）
-run_service "GIMBAL CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 gimbal_control 节点 ==='; ros2 launch ros2_head_control head_control.launch.py port:=$HEAD_CONTROL_PORT; exec bash"
+run_service "GIMBAL CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 gimbal_control 节点 ==='; export HEAD_CONTROL_PORT='$HEAD_CONTROL_PORT'; ros2 launch ros2_head_control head_control.launch.py port:=\$HEAD_CONTROL_PORT; exec bash"
 
 # 启动吸盘控制模块（如果启用）
 if [ "$SUCTION_PUMP_ENABLED" = "true" ]; then
     echo "=== 启动吸盘控制模块 ==="
     sleep 2
-    run_service "SUCTION PUMP CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 suction_pump_control 节点 ==='; ros2 launch adora_suction_pump_control suction_pump_control.launch.py port:=$SUCTION_PUMP_PORT; exec bash"
+    run_service "SUCTION PUMP CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 suction_pump_control 节点 ==='; export SUCTION_PUMP_PORT='$SUCTION_PUMP_PORT'; ros2 launch adora_suction_pump_control suction_pump_control.launch.py port:=\$SUCTION_PUMP_PORT; exec bash"
 else
     echo "=== 跳过吸盘控制模块 (未启用) ==="
 fi

@@ -12,7 +12,8 @@ echo ""
 # 检查是否在正确的目录
 if [ ! -f "install/setup.bash" ]; then
     echo "错误: 请在键盘控制包的根目录下运行此脚本"
-    echo "正确路径: /home/feng/tele_adora/leader/key_board/"
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    echo "正确路径: $script_dir"
     exit 1
 fi
 

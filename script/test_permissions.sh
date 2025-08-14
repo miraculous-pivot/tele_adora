@@ -56,7 +56,10 @@ script_names=(
     "webrtc 启动脚本"
 )
 
-cd /home/feng/tele_adora
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
 for i in "${!scripts[@]}"; do
     script="${scripts[$i]}"

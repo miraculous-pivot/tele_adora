@@ -1,18 +1,42 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     return LaunchDescription([
+        # 声明启动参数
+        DeclareLaunchArgument(
+            'dt_port',
+            default_value='/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027770-if00',
+            description='底盘控制器串口设备路径'
+        ),
+        DeclareLaunchArgument(
+            'dt_baudrate',
+            default_value='115200',
+            description='串口波特率'
+        ),
+        DeclareLaunchArgument(
+            'dt_odom_enable',
+            default_value='True',
+            description='是否启用里程计'
+        ),
+        DeclareLaunchArgument(
+            'dt_drive_type',
+            default_value='SDFZ',
+            description='驱动类型: SDFZ 或 HLS'
+        ),
+        
         Node(
             package='adora_chassis_bringup',
             executable='adora_a2_max_node',
             name='adora_a2_max_node',
             output='screen',
             parameters=[{
-                'dt_port': '/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027770-if00',
-                'dt_baudrate': 115200,
-                'dt_odom_enable': True,
-                'dt_drive_type': 'SDFZ', # 'SDFZ' of 'HLS'
+                'dt_port': LaunchConfiguration('dt_port'),
+                'dt_baudrate': LaunchConfiguration('dt_baudrate'),
+                'dt_odom_enable': LaunchConfiguration('dt_odom_enable'),
+                'dt_drive_type': LaunchConfiguration('dt_drive_type'),
                 'dt_log_display': True,
                 'dt_original_display': False,
             }],

@@ -24,13 +24,18 @@ echo ""
 
 # 演示配置文件功能
 echo "=== 演示配置文件功能 ==="
-echo "配置文件路径: /home/feng/tele_adora/config/device_mapping.txt"
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_FILE="$PROJECT_ROOT/config/device_mapping.txt"
+
+echo "配置文件路径: $CONFIG_FILE"
 echo ""
 
-if [ -f "/home/feng/tele_adora/config/device_mapping.txt" ]; then
+if [ -f "$CONFIG_FILE" ]; then
     echo "✓ 现有配置文件内容："
     echo "========================"
-    cat /home/feng/tele_adora/config/device_mapping.txt
+    cat "$CONFIG_FILE"
     echo "========================"
 else
     echo "❌ 配置文件不存在"
@@ -41,7 +46,7 @@ echo ""
 
 # 演示配置加载
 echo "=== 演示配置加载 ==="
-source /home/feng/tele_adora/script/load_device_config.sh
+source "$SCRIPT_DIR/load_device_config.sh"
 if load_device_config 2>/dev/null; then
     echo "✓ 配置加载成功！"
     echo ""

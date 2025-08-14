@@ -183,9 +183,10 @@ show_device_config_menu() {
     echo "2) 查看设备配置演示 (Configuration Demo)"
     echo "3) 测试设备配置系统 (Test Configuration)"
     echo "4) 查看当前设备状态 (Current Device Status)"
+    echo "5) 云台零点校准 (Head Zero Calibration)"
     echo "0) 返回上级菜单"
     echo ""
-    echo -n "请输入您的选择 [0-4]: "
+    echo -n "请输入您的选择 [0-5]: "
 }
 
 # 执行设备配置向导
@@ -213,6 +214,57 @@ run_device_test() {
     echo ""
     sudo chmod +x ./test_device_config.sh
     bash ./test_device_config.sh
+}
+
+# 云台零点校准
+run_head_calibration() {
+    print_info "启动云台零点校准..."
+    
+    # 云台校准脚本路径（使用测试版本）
+    CALIBRATION_SCRIPT="../slave/adora/ros2_head_control/head_calibration_test.py"
+    
+    if [ ! -f "$CALIBRATION_SCRIPT" ]; then
+        print_error "云台校准脚本不存在: $CALIBRATION_SCRIPT"
+        return 1
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}云台零点校准选项:${NC}"
+    echo "1) 查看当前云台状态并进行配置测试"
+    echo "2) 查看配置文件内容"
+    echo "0) 返回"
+    echo ""
+    echo -n "请输入您的选择 [0-2]: "
+    
+    read -r calibration_choice
+    
+    case $calibration_choice in
+        1)
+            print_info "启动云台配置测试..."
+            echo -e "${CYAN}正在执行: python3 $CALIBRATION_SCRIPT${NC}"
+            echo ""
+            python3 "$CALIBRATION_SCRIPT"
+            ;;
+        2)
+            print_info "查看云台配置文件..."
+            CONFIG_FILE="../slave/adora/ros2_head_control/config/head_zero_config.txt"
+            if [ -f "$CONFIG_FILE" ]; then
+                echo -e "${CYAN}配置文件内容:${NC}"
+                echo "========================="
+                cat "$CONFIG_FILE"
+                echo "========================="
+            else
+                print_error "配置文件不存在: $CONFIG_FILE"
+            fi
+            ;;
+        0)
+            return 0
+            ;;
+        *)
+            print_error "无效选择，请输入 0-2"
+            return 1
+            ;;
+    esac
 }
 
 # 显示当前设备状态
@@ -368,11 +420,16 @@ main() {
                             echo ""
                             read -p "按回车继续..."
                             ;;
+                        5)
+                            run_head_calibration
+                            echo ""
+                            read -p "按回车继续..."
+                            ;;
                         0)
                             break
                             ;;
                         *)
-                            print_error "无效选择，请输入 0-4"
+                            print_error "无效选择，请输入 0-5"
                             ;;
                     esac
                 done

@@ -10,8 +10,11 @@ import time
 import sys
 import os
 
-# 添加piper_sdk到Python路径
-sys.path.append('/home/feng/tele_adora/piper_sdk')
+# 添加piper_sdk到Python路径 - 使用相对路径
+script_dir = os.path.dirname(os.path.abspath(__file__))
+tele_adora_root = os.path.join(script_dir, '..', '..', '..', '..', '..')
+piper_sdk_path = os.path.join(tele_adora_root, 'piper_sdk')
+sys.path.append(piper_sdk_path)
 from piper_sdk import C_PiperInterface_V2
 
 # 注意：你需要根据你的实际硬件配置修改CAN端口和机械臂的参数

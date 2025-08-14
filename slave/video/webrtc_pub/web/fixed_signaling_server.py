@@ -158,8 +158,10 @@ class CORSHTTPRequestHandler(SimpleHTTPRequestHandler):
 def run_http_server():
     """运行HTTP服务器"""
     try:
-        # 切换到正确的目录
-        os.chdir('/home/feng/webrtc_pub')
+        # 获取脚本所在目录并切换到webrtc_pub目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        webrtc_pub_dir = os.path.join(script_dir, '..')
+        os.chdir(webrtc_pub_dir)
         
         server = HTTPServer(('localhost', 8081), CORSHTTPRequestHandler)
         logger.info("🌐 HTTP服务器启动在 http://localhost:8081")

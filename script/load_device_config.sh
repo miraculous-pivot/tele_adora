@@ -3,7 +3,10 @@
 # 设备配置加载器
 # 用于从配置文件加载设备映射并设置环境变量
 
-DEVICE_CONFIG_FILE="/home/feng/tele_adora/config/device_mapping.txt"
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEVICE_CONFIG_FILE="$PROJECT_ROOT/config/device_mapping.txt"
 
 # 函数：加载设备配置
 load_device_config() {
@@ -15,12 +18,12 @@ load_device_config() {
     
     echo "加载设备配置..."
     
-    # 设置默认值
-    export HEAD_CONTROL_PORT="/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00"
-    export CHASSIS_CONTROL_PORT="/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027770-if00"
-    export LIFTING_MOTOR_PORT="/dev/serial/by-id/usb-1a86_USB_Single_Serial_56D0001775-if00"
-    export SUCTION_PUMP_PORT="/dev/ttyACM0"
-    export SUCTION_PUMP_ENABLED="false"
+    # 设置默认值（只在变量未设置时使用）
+    export HEAD_CONTROL_PORT="${HEAD_CONTROL_PORT:-/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C021229-if00}"
+    export CHASSIS_CONTROL_PORT="${CHASSIS_CONTROL_PORT:-/dev/serial/by-id/usb-1a86_USB_Single_Serial_594C027770-if00}"
+    export LIFTING_MOTOR_PORT="${LIFTING_MOTOR_PORT:-/dev/serial/by-id/usb-1a86_USB_Single_Serial_56D0001775-if00}"
+    export SUCTION_PUMP_PORT="${SUCTION_PUMP_PORT:-/dev/ttyACM0}"
+    export SUCTION_PUMP_ENABLED="${SUCTION_PUMP_ENABLED:-false}"
     
     # 从配置文件加载
     while IFS='=' read -r key value; do
@@ -123,11 +126,41 @@ show_device_status() {
     echo ""
     echo "当前设备配置:"
     echo "=============="
-    echo "头部控制设备: $HEAD_CONTROL_PORT"
-    echo "底盘控制设备: $CHASSIS_CONTROL_PORT"
-    echo "升降电机设备: $LIFTING_MOTOR_PORT"
-    echo "吸盘控制设备: $SUCTION_PUMP_PORT"
-    echo "吸盘功能状态: $SUCTION_PUMP_ENABLED"
+    
+    if [ -f "$DEVICE_CONFIG_FILE" ]; then
+        # 直接从配置文件读取并显示
+        local head_port=""
+        local chassis_port=""
+        local lifting_port=""
+        local suction_port=""
+        local suction_enabled="false"
+        
+        while IFS='=' read -r key value; do
+            # 跳过注释和空行
+            [[ $key =~ ^#.*$ ]] && continue
+            [[ -z $key ]] && continue
+            
+            # 去除空格
+            key=$(echo "$key" | tr -d ' ')
+            value=$(echo "$value" | tr -d ' ')
+            
+            case "$key" in
+                HEAD_CONTROL_PORT) head_port="$value" ;;
+                CHASSIS_CONTROL_PORT) chassis_port="$value" ;;
+                LIFTING_MOTOR_PORT) lifting_port="$value" ;;
+                SUCTION_PUMP_PORT) suction_port="$value" ;;
+                SUCTION_PUMP_ENABLED) suction_enabled="$value" ;;
+            esac
+        done < "$DEVICE_CONFIG_FILE"
+        
+        echo "头部控制设备: $head_port"
+        echo "底盘控制设备: $chassis_port"
+        echo "升降电机设备: $lifting_port"
+        echo "吸盘控制设备: $suction_port"
+        echo "吸盘功能状态: $suction_enabled"
+    else
+        echo "设备配置文件不存在: $DEVICE_CONFIG_FILE"
+    fi
     echo ""
 }
 

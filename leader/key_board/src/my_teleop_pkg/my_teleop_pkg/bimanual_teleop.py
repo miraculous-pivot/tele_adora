@@ -8,104 +8,92 @@ import sys, select, termios, tty
 
 # 打印的说明信息
 msg = """
-Bimanual (Two-Armed) Robotic Teleop - 6-DOF Control + Lifting Motor + Head Control                 # 云台控制 - 数字键1,3,5,7控制
-                elif key in head_control_keys:
-                    direction = head_control_keys[key]
-                    head_control_active = True
-                    if direction == 'up':
-                        self.head_pitch_delta = self.head_pitch_speed  # 抬头
-                        self.head_yaw_delta = 0.0
-                    elif direction == 'down':
-                        self.head_pitch_delta = -self.head_pitch_speed  # 低头
-                        self.head_yaw_delta = 0.0
-                    elif direction == 'left':
-                        self.head_pitch_delta = 0.0
-                        self.head_yaw_delta = self.head_yaw_speed  # 向左转
-                    elif direction == 'right':
-                        self.head_pitch_delta = 0.0
-                        self.head_yaw_delta = -self.head_yaw_speed  # 向右转ontrol + Suction Pump
--------------------------------------------------------------------------------------------------------------------
-Left Hand:
-    w/s: +X / -X (forward/backward)
-    a/d: +Y / -Y (left/right)
-    q/e: +Z / -Z (up/down)
-    r/f: +RX / -RX (roll)
-    t/g: +RY / -RY (pitch)
-    y/h: +RZ / -RZ (yaw)
-    v:   toggle gripper
+简化双臂机器人遥控 - 仅使用字母键控制
+====================================================
+操作理念：小写字母=正方向，大写字母=负方向
 
-Right Hand:
-    i/k: +X / -X (forward/backward)
-    j/l: +Y / -Y (left/right)
-    u/o: +Z / -Z (up/down)
-    p/;: +RX / -RX (roll)
-    '[: +RY / -RY (pitch)
-    ]': +RZ / -RZ (yaw)
-    m:   toggle gripper
+左手区域（左臂控制 + 底盘移动）：
+    左臂6DOF控制：
+    w/W: +X/-X (前进/后退)
+    a/A: +Y/-Y (左/右)  
+    s/S: +Z/-Z (上/下)
+    d/D: +RX/-RX (roll)
+    f/F: +RY/-RY (pitch)  
+    g/G: +RZ/-RZ (yaw)
+    v/V: 夹爪开/关
+    
+    底盘移动：
+    t/T: 前进/后退
+    r/R: 左转/右转
 
-Head Control (Gimbal):
-    n: +Pitch (look up)
-    b: -Pitch (look down)
-    ,: +Yaw (turn left)
-    .: -Yaw (turn right)
+右手区域（右臂控制 + 云台控制）：
+    右臂6DOF控制：
+    i/I: +X/-X (前进/后退)
+    j/J: +Y/-Y (左/右)
+    k/K: +Z/-Z (上/下)  
+    l/L: +RX/-RX (roll)
+    o/O: +RY/-RY (pitch)
+    p/P: +RZ/-RZ (yaw)
+    m/M: 夹爪开/关
+    
+    云台控制：
+    u/U: 抬头/低头
+    y/Y: 左转/右转
 
-Chassis Control:
-    9: Forward (前进)
-    0: Backward (后退)  
-    -: Turn Left (左转)
-    =: Turn Right (右转)
-
-Suction Pump Control:
-    c: Toggle suction pump (on/off)
-
-Lifting Motor (Toggle Mode):
-    z:   toggle lift up (press once to start, press again to stop)
-    x:   toggle lift down (press once to start, press again to stop)
-
-space key or 'esc': force stop and quit
+通用控制：
+    c/C: 吸盘开/关
+    z/Z: 升降上/下
+    
+空格键 或 ESC: 紧急停止并退出
+====================================================
 """
 
-# 键位映射: (x, y, z, rx, ry, rz)
-key_bindings = {
-    # Left Hand
-    'w': (1, 0, 0, 0, 0, 0), 's': (-1, 0, 0, 0, 0, 0),
-    'a': (0, 1, 0, 0, 0, 0), 'd': (0, -1, 0, 0, 0, 0),
-    'q': (0, 0, 1, 0, 0, 0), 'e': (0, 0, -1, 0, 0, 0),
-    'r': (0, 0, 0, 1, 0, 0), 'f': (0, 0, 0, -1, 0, 0),
-    't': (0, 0, 0, 0, 1, 0), 'g': (0, 0, 0, 0, -1, 0),
-    'y': (0, 0, 0, 0, 0, 1), 'h': (0, 0, 0, 0, 0, -1),
-    # Right Hand
-    'i': (1, 0, 0, 0, 0, 0), 'k': (-1, 0, 0, 0, 0, 0),
-    'j': (0, 1, 0, 0, 0, 0), 'l': (0, -1, 0, 0, 0, 0),
-    'u': (0, 0, 1, 0, 0, 0), 'o': (0, 0, -1, 0, 0, 0),
-    'p': (0, 0, 0, 1, 0, 0), ';': (0, 0, 0, -1, 0, 0),
-    '[': (0, 0, 0, 0, 1, 0), ']': (0, 0, 0, 0, -1, 0),
-    "'": (0, 0, 0, 0, 0, 1), '\\':(0, 0, 0, 0, 0, -1),
+# 简化的键位映射 - 只使用字母键，大小写控制方向
+# 格式: (x, y, z, rx, ry, rz)
+
+# 左臂控制键位（左手区域）
+left_arm_keys = {
+    # 位置控制 (XYZ)
+    'w': (1, 0, 0, 0, 0, 0),   'W': (-1, 0, 0, 0, 0, 0),   # X轴 前进/后退
+    'a': (0, 1, 0, 0, 0, 0),   'A': (0, -1, 0, 0, 0, 0),   # Y轴 左/右
+    's': (0, 0, 1, 0, 0, 0),   'S': (0, 0, -1, 0, 0, 0),   # Z轴 上/下
+    # 姿态控制 (RxRyRz)
+    'd': (0, 0, 0, 1, 0, 0),   'D': (0, 0, 0, -1, 0, 0),   # Roll
+    'f': (0, 0, 0, 0, 1, 0),   'F': (0, 0, 0, 0, -1, 0),   # Pitch
+    'g': (0, 0, 0, 0, 0, 1),   'G': (0, 0, 0, 0, 0, -1),   # Yaw
 }
 
-left_hand_keys = ['w', 's', 'a', 'd', 'q', 'e', 'r', 'f', 't', 'g', 'y', 'h']
-right_hand_keys = ['i', 'k', 'j', 'l', 'u', 'o', 'p', ';', '[', ']', "'", '\\']
-left_gripper_key = 'v'
-right_gripper_key = 'm'
-lifting_up_key = 'z'
-lifting_down_key = 'x'
-suction_pump_key = 'c'
-
-# 云台控制键位 - 使用方向键式布局的字母键
-head_control_keys = {
-    'n': 'up',      # n: 抬头（+Pitch）
-    'b': 'down',    # b: 低头（-Pitch）  
-    ',': 'left',    # ,: 向左转（+Yaw）
-    '.': 'right'    # .: 向右转（-Yaw）
+# 右臂控制键位（右手区域）
+right_arm_keys = {
+    # 位置控制 (XYZ)
+    'i': (1, 0, 0, 0, 0, 0),   'I': (-1, 0, 0, 0, 0, 0),   # X轴 前进/后退
+    'j': (0, 1, 0, 0, 0, 0),   'J': (0, -1, 0, 0, 0, 0),   # Y轴 左/右
+    'k': (0, 0, 1, 0, 0, 0),   'K': (0, 0, -1, 0, 0, 0),   # Z轴 上/下
+    # 姿态控制 (RxRyRz)
+    'l': (0, 0, 0, 1, 0, 0),   'L': (0, 0, 0, -1, 0, 0),   # Roll
+    'o': (0, 0, 0, 0, 1, 0),   'O': (0, 0, 0, 0, -1, 0),   # Pitch
+    'p': (0, 0, 0, 0, 0, 1),   'P': (0, 0, 0, 0, 0, -1),   # Yaw
 }
 
-# 底盘控制键位 - 使用右上角按键（避免与手臂控制冲突）
-chassis_control_keys = {
-    '9': 'forward',     # 9: 前进
-    '0': 'backward',    # 0: 后退
-    '-': 'turn_left',   # -: 左转
-    '=': 'turn_right'   # =: 右转
+# 夹爪控制
+left_gripper_keys = ['v', 'V']   # 左臂夹爪
+right_gripper_keys = ['m', 'M']  # 右臂夹爪
+
+# 底盘控制键位
+chassis_keys = {
+    't': 'forward',    'T': 'backward',   # 前进/后退
+    'r': 'turn_left',  'R': 'turn_right', # 左转/右转
 }
+
+# 云台控制键位
+head_keys = {
+    'u': 'up',      'U': 'down',    # 抬头/低头
+    'y': 'left',    'Y': 'right',   # 左转/右转
+}
+
+# 通用控制
+suction_keys = ['c', 'C']           # 吸盘开关
+lifting_keys = {'z': 'up', 'Z': 'down'}  # 升降控制
 
 
 def get_key(settings):
@@ -265,17 +253,6 @@ class BimanualTeleopNode(Node):
                 
                 key = get_key(self.settings)
 
-                # 调试：打印所有按键
-                if key:
-                    ascii_val = ord(key)
-                    self.get_logger().info(f"Key: '{key}' ASCII: {ascii_val}")
-                    
-                    # 特别检查云台控制键
-                    if key in ['n', 'b', ',', '.']:
-                        self.get_logger().info(f"Detected head control key: {key}")
-                    elif key == '\x1b':
-                        self.get_logger().info("ESC key detected - this will exit the program")
-
                 # 默认将所有速度目标清零
                 self.left_pose_delta = {k: 0.0 for k in self.left_pose_delta}
                 self.right_pose_delta = {k: 0.0 for k in self.right_pose_delta}
@@ -288,8 +265,9 @@ class BimanualTeleopNode(Node):
                 head_control_active = False
 
                 # --- 根据按键更新状态 ---
-                if key in left_hand_keys:
-                    deltas = key_bindings[key]
+                # 左臂控制
+                if key in left_arm_keys:
+                    deltas = left_arm_keys[key]
                     self.left_pose_delta['x'] = deltas[0]
                     self.left_pose_delta['y'] = deltas[1]
                     self.left_pose_delta['z'] = deltas[2]
@@ -297,11 +275,13 @@ class BimanualTeleopNode(Node):
                     self.left_pose_delta['ry'] = deltas[4]
                     self.left_pose_delta['rz'] = deltas[5]
 
-                elif key == left_gripper_key:
+                # 左臂夹爪控制
+                elif key in left_gripper_keys:
                     self.left_gripper_open = not self.left_gripper_open
                 
-                elif key in right_hand_keys:
-                    deltas = key_bindings[key]
+                # 右臂控制
+                elif key in right_arm_keys:
+                    deltas = right_arm_keys[key]
                     self.right_pose_delta['x'] = deltas[0]
                     self.right_pose_delta['y'] = deltas[1]
                     self.right_pose_delta['z'] = deltas[2]
@@ -309,86 +289,80 @@ class BimanualTeleopNode(Node):
                     self.right_pose_delta['ry'] = deltas[4]
                     self.right_pose_delta['rz'] = deltas[5]
 
-                elif key == right_gripper_key:
+                # 右臂夹爪控制
+                elif key in right_gripper_keys:
                     self.right_gripper_open = not self.right_gripper_open
                 
-                # 云台控制 - 数字键1,3,5,7控制
-                elif key in head_control_keys:
-                    direction = head_control_keys[key]
+                # 云台控制
+                elif key in head_keys:
+                    direction = head_keys[key]
                     head_control_active = True
-                    self.get_logger().info(f"Head control key pressed: {key} -> {direction}")  # 调试信息
                     if direction == 'up':
-                        self.head_pitch_position += self.head_pitch_speed  # 累积增量
+                        self.head_pitch_position += self.head_pitch_speed
                         self.head_pitch_delta = self.head_pitch_position
                         self.head_yaw_delta = self.head_yaw_position
-                        self.get_logger().info(f"Up: pitch_pos={self.head_pitch_position}, pitch_delta={self.head_pitch_delta}")
                     elif direction == 'down':
-                        self.head_pitch_position -= self.head_pitch_speed  # 累积增量
+                        self.head_pitch_position -= self.head_pitch_speed
                         self.head_pitch_delta = self.head_pitch_position
                         self.head_yaw_delta = self.head_yaw_position
-                        self.get_logger().info(f"Down: pitch_pos={self.head_pitch_position}, pitch_delta={self.head_pitch_delta}")
                     elif direction == 'left':
-                        self.head_yaw_position += self.head_yaw_speed      # 累积增量
+                        self.head_yaw_position += self.head_yaw_speed
                         self.head_pitch_delta = self.head_pitch_position
                         self.head_yaw_delta = self.head_yaw_position
-                        self.get_logger().info(f"Left: yaw_pos={self.head_yaw_position}, yaw_delta={self.head_yaw_delta}")
                     elif direction == 'right':
-                        self.head_yaw_position -= self.head_yaw_speed      # 累积增量
+                        self.head_yaw_position -= self.head_yaw_speed
                         self.head_pitch_delta = self.head_pitch_position
                         self.head_yaw_delta = self.head_yaw_position
-                        self.get_logger().info(f"Right: yaw_pos={self.head_yaw_position}, yaw_delta={self.head_yaw_delta}")
                 
-                # 底盘控制 - 数字键8,2,4,6控制
-                elif key in chassis_control_keys:
-                    direction = chassis_control_keys[key]
+                # 底盘控制
+                elif key in chassis_keys:
+                    direction = chassis_keys[key]
                     if direction == 'forward':
-                        self.chassis_linear_vel = self.chassis_linear_speed  # 前进
+                        self.chassis_linear_vel = self.chassis_linear_speed
                     elif direction == 'backward':
-                        self.chassis_linear_vel = -self.chassis_linear_speed  # 后退
+                        self.chassis_linear_vel = -self.chassis_linear_speed
                     elif direction == 'turn_left':
-                        self.chassis_angular_vel = self.chassis_angular_speed  # 左转
+                        self.chassis_angular_vel = self.chassis_angular_speed
                     elif direction == 'turn_right':
-                        self.chassis_angular_vel = -self.chassis_angular_speed  # 右转
+                        self.chassis_angular_vel = -self.chassis_angular_speed
                 
-                # 吸盘控制 - c键切换
-                elif key == suction_pump_key:
+                # 吸盘控制
+                elif key in suction_keys:
                     self.suction_pump_on = not self.suction_pump_on
                     if self.suction_pump_on:
                         self.get_logger().info("Suction pump turned ON")
                     else:
                         self.get_logger().info("Suction pump turned OFF")
                 
-                # 升降电机控制 - 切换式控制
-                elif key == lifting_up_key:
+                # 升降电机控制
+                elif key in lifting_keys:
+                    direction = lifting_keys[key]
                     if self.lifting_motor_ready and self.current_lifting_height is not None:
-                        if self.lifting_up_active:
-                            # 当前正在上升，按键停止
-                            self.lifting_up_active = False
-                            self.get_logger().info("Stopping upward movement")
-                        else:
-                            # 当前未在上升，开始上升
-                            self.lifting_down_active = False  # 确保下降停止
-                            self.lifting_up_active = True
-                            self.get_logger().info("Starting continuous upward movement")
+                        if direction == 'up':
+                            if self.lifting_up_active:
+                                # 当前正在上升，按键停止
+                                self.lifting_up_active = False
+                                self.get_logger().info("Stopping upward movement")
+                            else:
+                                # 当前未在上升，开始上升
+                                self.lifting_down_active = False  # 确保下降停止
+                                self.lifting_up_active = True
+                                self.get_logger().info("Starting continuous upward movement")
+                        elif direction == 'down':
+                            if self.lifting_down_active:
+                                # 当前正在下降，按键停止
+                                self.lifting_down_active = False
+                                self.get_logger().info("Stopping downward movement")
+                            else:
+                                # 当前未在下降，开始下降
+                                self.lifting_up_active = False  # 确保上升停止
+                                self.lifting_down_active = True
+                                self.get_logger().info("Starting continuous downward movement")
                     else:
                         self.get_logger().warn("Lifting motor not ready yet, waiting for initial position...")
                 
-                elif key == lifting_down_key:
-                    if self.lifting_motor_ready and self.current_lifting_height is not None:
-                        if self.lifting_down_active:
-                            # 当前正在下降，按键停止
-                            self.lifting_down_active = False
-                            self.get_logger().info("Stopping downward movement")
-                        else:
-                            # 当前未在下降，开始下降
-                            self.lifting_up_active = False  # 确保上升停止
-                            self.lifting_down_active = True
-                            self.get_logger().info("Starting continuous downward movement")
-                    else:
-                        self.get_logger().warn("Lifting motor not ready yet, waiting for initial position...")
-                
-                # 退出条件 - 只有纯ESC键或空格键才退出
-                elif key == ' ' or key == '\x1b': # space or pure esc (not escape sequences)
+                # 退出条件 - 空格键或ESC键
+                elif key == ' ' or key == '\x1b':
                     break
                 
                 # --- 发布左臂消息 ---

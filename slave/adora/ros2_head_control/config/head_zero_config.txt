@@ -1,0 +1,9 @@
+# 云台零点配置文件
+# 自动生成于 2025年08月14日 18:04:34
+# 
+# 格式说明:
+# PITCH_ZERO_OFFSET=<pitch轴零点偏移值，单位：度>
+# YAW_ZERO_OFFSET=<yaw轴零点偏移值，单位：度>
+#
+PITCH_ZERO_OFFSET=-15595.56
+YAW_ZERO_OFFSET=5687.00
