@@ -143,7 +143,7 @@ run_service "CHASSIS CONTROL" "$PWD" "source install/setup.bash; echo '=== 启�
 sleep 2
 
 # 启动云台控制模块（独立终端）
-run_service "GIMBAL CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 gimbal_control 节点 ==='; export HEAD_CONTROL_PORT='$HEAD_CONTROL_PORT'; ros2 launch ros2_head_control head_control.launch.py port:=\$HEAD_CONTROL_PORT; exec bash"
+# run_service "GIMBAL CONTROL" "$PWD" "source install/setup.bash; echo '=== 启动 gimbal_control 节点 ==='; export HEAD_CONTROL_PORT='$HEAD_CONTROL_PORT'; ros2 launch ros2_head_control head_control.launch.py port:=\$HEAD_CONTROL_PORT; exec bash"
 
 # 启动吸盘控制模块（如果启用）
 if [ "$SUCTION_PUMP_ENABLED" = "true" ]; then
@@ -172,7 +172,8 @@ cd ../../../
 # 启动RealSense双摄像头（独立终端）
 echo "=== 启动RealSense双摄像头 ==="
 cd ./slave/video/camera/librealsense
-run_service "REALSENSE CAMERAS" "$PWD" "source install/setup.bash; ros2 launch realsense2_camera rs_dual_camera_launch.py serial_no1:=_130322272642 serial_no2:=_130322270912; exec bash"
+#run_service "REALSENSE CAMERAS" "$PWD" "source install/setup.bash; ros2 launch realsense2_camera rs_dual_camera_launch.py serial_no1:=_130322272642 serial_no2:=_130322270912; exec bash"
+run_service "REALSENSE CAMERAS" "$PWD" "realsense-viewer; exec bash"
 cd ../../../../
 
 # 启动Orbbec摄像头（独立终端）
@@ -191,10 +192,11 @@ sleep 2
 
 
 #启动webrtc
-echo "=== 启动webrtc ==="
-pwd
-cd ./slave/video/webrtc_pub
-colcon build 
-run_service "WEB RTC" "$PWD" "echo '=== 启动WEB RTC ==='; sourve install/setup.bash; bash ./start_multi_camera.sh;"
+# echo "=== 启动webrtc ==="
+# pwd
+# cd ./slave/video/webrtc_pub
+# colcon build 
+# run_service "WEB RTC" "$PWD" "echo '=== 启动WEB RTC ==='; sourve install/setup.bash; bash ./start_multi_camera.sh;"
 
 echo "所有模块已启动完成！"
+rviz2
